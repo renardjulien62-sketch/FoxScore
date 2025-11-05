@@ -1,10 +1,13 @@
 // --- VARIABLES GLOBALES ---
-let joueurs = []; // { nom, couleur, scoreTotal, scoresTour, scoreRelatifPivot, rang } <-- Ajout de rang
+let joueurs = [];
 let scoresSecrets = false;
 let mancheActuelle = 0;
 let lowScoreWins = true;
 let monGraphique = null;
-let classementFinal = []; // Contiendra les joueurs avec leur rang calculé
+let classementFinal = [];
+let nomJeuActuel = "Partie";
+let categoriesJeuxConnues = []; // NOUVEAU : Pour l'autocomplétion
+let joueursRecents = []; // NOUVEAU : Pour les suggestions
 
 let sequenceForceStop = false;
 let currentStepSkipper = null;
@@ -16,7 +19,6 @@ let conditionsArret = {
     manche_restante: { active: false, mancheCible: 0 }
 };
 
-// Mappage
 const inputIdMap = {
     'score_limite': 'score-limite',
     'score_relatif': 'score-relatif',
@@ -25,12 +27,15 @@ const inputIdMap = {
 };
 
 // --- SÉLECTION DES ÉLÉMENTS HTML ---
-// (Inchangé)
 const configEcran = document.getElementById('configuration-ecran');
 const scoreEcran = document.getElementById('score-ecran');
 const podiumEcran = document.getElementById('podium-ecran');
+const nomJeuConfigInput = document.getElementById('nom-jeu-config');
+const datalistJeux = document.getElementById('datalist-jeux'); // NOUVEAU
 const nomJoueurInput = document.getElementById('nom-joueur');
 const ajouterBouton = document.getElementById('ajouter-joueur');
+const suggestionsJoueursDiv = document.getElementById('suggestions-joueurs'); // NOUVEAU
+const listeSuggestionsJoueurs = document.getElementById('liste-suggestions-joueurs'); // NOUVEAU
 const demarrerBouton = document.getElementById('demarrer-partie');
 const listeJoueursConf = document.getElementById('liste-joueurs-conf');
 const scoreAffichageDiv = document.getElementById('score-affichage');
@@ -46,6 +51,7 @@ const revealRang = document.getElementById('reveal-rang');
 const revealNom = document.getElementById('reveal-nom');
 const revealScore = document.getElementById('reveal-score');
 const skipAllBtn = document.getElementById('skip-all-btn');
+const retourAccueilBtn = document.getElementById('retour-accueil-btn');
 const manchesPasseesAffichage = document.getElementById('manches-passees');
 const manchesRestantesAffichageDiv = document.getElementById('manches-restantes-affichage');
 const manchesRestantesAffichage = document.getElementById('manches-restantes');
@@ -74,14 +80,10 @@ function attendreFinAnimation(element) { /* ... (inchangé) ... */
     });
 }
 
-/**
- * NOUVEAU : Calcule les rangs en gérant les égalités
- */
-function calculerRangs(joueursTries) {
+function calculerRangs(joueursTries) { /* ... (inchangé) ... */
     let rangActuel = 0;
     let scorePrecedent = null;
     let nbExAequo = 1;
-
     joueursTries.forEach((joueur, index) => {
         if (joueur.scoreTotal !== scorePrecedent) {
             rangActuel += nbExAequo;
@@ -92,7 +94,7 @@ function calculerRangs(joueursTries) {
         joueur.rang = rangActuel;
         scorePrecedent = joueur.scoreTotal;
     });
-    return joueursTries; // Retourne la liste avec la propriété 'rang' ajoutée
+    return joueursTries;
 }
 
 
@@ -127,31 +129,22 @@ function genererChampsSaisie() { /* ... (inchangé) ... */
     });
 }
 
-/**
- * MODIFIÉ : Utilise le rang calculé si non secret
- */
-function mettreAJourScoresAffichage() {
+function mettreAJourScoresAffichage() { /* ... (inchangé) ... */
     scoreAffichageDiv.innerHTML = '';
     let listePourAffichage = [];
-
-    // On recalcule les rangs uniquement si on n'est pas en mode secret
     if (!scoresSecrets) {
         let joueursTries = [...joueurs].sort((a, b) => {
             return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal;
         });
-        listePourAffichage = calculerRangs(joueursTries); // Ajoute la propriété 'rang'
+        listePourAffichage = calculerRangs(joueursTries);
     } else {
-        listePourAffichage = joueurs; // Pas de tri, pas de rangs
+        listePourAffichage = joueurs;
     }
-
     let html = '<table class="classement-table">';
     html += '<thead><tr><th>#</th><th>Joueur</th><th>Total</th></tr></thead>';
     html += '<tbody>';
-
-    listePourAffichage.forEach((joueur) => { // Pas besoin d'index ici
-        // Utilise le rang calculé s'il existe, sinon '-'
+    listePourAffichage.forEach((joueur) => {
         const rangAffichage = joueur.rang && !scoresSecrets ? joueur.rang : '-';
-
         html += `
             <tr>
                 <td>${rangAffichage}</td>
@@ -167,8 +160,6 @@ function mettreAJourScoresAffichage() {
     scoreAffichageDiv.innerHTML = html;
 }
 
-
-// (Fonctions mettreAJourCompteurs, verifierConditionsArret - Inchangées)
 function mettreAJourCompteurs() { /* ... (inchangé) ... */
     manchesPasseesAffichage.textContent = mancheActuelle;
     let restantesManches = Infinity; let afficherManchesRestantes = false;
@@ -189,55 +180,35 @@ function verifierConditionsArret() { /* ... (inchangé) ... */
     if (doitTerminer) { terminerPartie(); }
 }
 
-/**
- * MODIFIÉ : Utilise les rangs calculés pour remplir le podium et la liste
- */
-function construirePodiumFinal() {
+function construirePodiumFinal() { /* ... (inchangé) ... */
     currentStepSkipper = null;
-    const podiumMap = {
-        1: document.getElementById('podium-1'),
-        2: document.getElementById('podium-2'),
-        3: document.getElementById('podium-3')
-    };
-
-    // Réinitialise les blocs podium (enlève 'cache' si ajouté précédemment)
+    const podiumMap = { 1: document.getElementById('podium-1'), 2: document.getElementById('podium-2'), 3: document.getElementById('podium-3') };
     Object.values(podiumMap).forEach(el => el.classList.remove('cache'));
-
-    // Trouve les joueurs pour chaque place (peuvent être plusieurs en cas d'égalité)
     const premier = classementFinal.filter(j => j.rang === 1);
     const deuxieme = classementFinal.filter(j => j.rang === 2);
     const troisieme = classementFinal.filter(j => j.rang === 3);
-
-    // Fonction pour remplir un bloc podium
     const remplirPlace = (element, joueursPlace) => {
         if (joueursPlace.length > 0) {
-            // Prend le premier joueur pour la couleur et le score (ils sont identiques)
             const joueurRef = joueursPlace[0];
-            // Liste tous les noms
             const noms = joueursPlace.map(j => j.nom).join(' & ');
             element.querySelector('.podium-nom').textContent = noms;
             element.querySelector('.podium-score').textContent = `${joueurRef.scoreTotal} pts`;
             element.style.borderColor = joueurRef.couleur;
             element.style.boxShadow = `0 0 15px ${joueurRef.couleur}80`;
         } else {
-            element.classList.add('cache'); // Cache la place si personne n'a ce rang
+            element.classList.add('cache');
         }
     };
-
     remplirPlace(podiumMap[1], premier);
     remplirPlace(podiumMap[2], deuxieme);
     remplirPlace(podiumMap[3], troisieme);
-
-    // Remplit la liste des "autres joueurs" (rang 4+)
     const autresListe = document.getElementById('autres-joueurs-liste');
     autresListe.innerHTML = '';
-    const autresJoueurs = classementFinal.filter(j => j.rang > 3); // Sélectionne par rang
-
+    const autresJoueurs = classementFinal.filter(j => j.rang > 3);
     if(autresJoueurs.length === 0) {
         document.getElementById('autres-joueurs').classList.add('cache');
     } else {
         document.getElementById('autres-joueurs').classList.remove('cache');
-        // Trie les autres joueurs par rang (même s'ils devraient déjà l'être)
         autresJoueurs.sort((a, b) => a.rang - b.rang);
         autresJoueurs.forEach((joueur) => {
             const li = document.createElement('li');
@@ -248,8 +219,6 @@ function construirePodiumFinal() {
             autresListe.appendChild(li);
         });
     }
-
-    // Déplacement du graphique
     const graphContainer = document.querySelector('.graphique-container');
     const graphPlaceholder = document.getElementById('graphique-final-container');
     if (graphContainer && graphPlaceholder) {
@@ -261,59 +230,31 @@ function construirePodiumFinal() {
     }
 }
 
-/**
- * MODIFIÉ : Utilise le rang calculé pour l'affichage
- */
-function majContenuReveal(rang, joueur, estExAequoPrecedent) {
+function majContenuReveal(rang, joueur, estExAequoPrecedent) { /* ... (inchangé) ... */
     let rangTexte = `${rang}ème Place`;
-    // Gère l'affichage pour les ex aequo et les médailles
-    if (estExAequoPrecedent) {
-         rangTexte = `Ex æquo ${rang}ème Place`;
-    }
+    if (estExAequoPrecedent) { rangTexte = `Ex æquo ${rang}ème Place`; }
     if (rang === 3) rangTexte = `🥉 ${estExAequoPrecedent ? 'Ex æquo ' : ''}3ème Place`;
     if (rang === 1) rangTexte = `🥇 GAGNANT ${estExAequoPrecedent ? 'Ex æquo ' : ''}!`;
-
-
     revealRang.textContent = rangTexte;
     revealNom.textContent = joueur.nom;
     revealNom.style.color = joueur.couleur;
     revealScore.textContent = `${joueur.scoreTotal} points`;
-
     revealContent.classList.remove('is-revealed');
 }
 
-
-/**
- * MODIFIÉ : Utilise les rangs et gère l'affichage ex aequo
- */
+// MODIFIÉ : Affiche le bouton "Retour"
 async function demarrerSequenceReveal() {
     scoreEcran.classList.add('cache');
     revealEcran.classList.remove('cache');
-
-    // Le classementFinal contient maintenant les joueurs triés AVEC leur rang calculé
-    // classementFinal = calculerRangs([...joueurs].sort(...)); // Déjà fait dans terminerPartie
-
-    // Crée la liste des joueurs à révéler : 5e, 4e, 3e, 1er
     let joueursAReveler = [];
-    // Ajoute tous ceux qui ne sont pas 1er ou 2ème, du dernier au 3ème
     joueursAReveler.push(...classementFinal.filter(j => j.rang > 2).reverse());
-    // Ajoute le(s) 1er(s)
     joueursAReveler.push(...classementFinal.filter(j => j.rang === 1));
-
-
-    let rangPrecedent = null; // Pour détecter les ex aequo pendant la révélation
-
-    // Boucle de révélation
+    let rangPrecedent = null;
     for (const joueur of joueursAReveler) {
         if (sequenceForceStop) return;
-
-        // Le rang est maintenant une propriété de l'objet joueur
         const rang = joueur.rang;
-        const estExAequo = (rang === rangPrecedent); // Est-ce le même rang que le précédent révélé ?
-
-        majContenuReveal(rang, joueur, estExAequo); // Passe l'info ex aequo
-
-        // Animations...
+        const estExAequo = (rang === rangPrecedent);
+        majContenuReveal(rang, joueur, estExAequo);
         revealContent.classList.add('slide-in-from-left');
         await attendreFinAnimation(revealContent);
         revealContent.classList.remove('slide-in-from-left');
@@ -327,54 +268,36 @@ async function demarrerSequenceReveal() {
         if (sequenceForceStop) return;
         await pause(2500);
         if (sequenceForceStop) return;
-
-        // Glisse vers la droite (sauf pour le tout dernier joueur révélé, qui est le gagnant)
         if (joueur !== joueursAReveler[joueursAReveler.length - 1]) {
             revealContent.classList.add('slide-out-to-right');
             await attendreFinAnimation(revealContent);
             revealContent.classList.remove('slide-out-to-right', 'is-revealed');
         }
-
-        rangPrecedent = rang; // Mémorise le rang pour la prochaine itération
+        rangPrecedent = rang;
     }
-
-    // Fin de la séquence, affiche le podium
     revealEcran.classList.add('cache');
     podiumEcran.classList.remove('cache');
-    construirePodiumFinal(); // Utilise classementFinal qui a les rangs
+    retourAccueilBtn.classList.remove('cache'); // Affiche le bouton retour
+    construirePodiumFinal();
 }
 
 
-/**
- * MODIFIÉ : Calcule les rangs ET SAUVEGARDE L'HISTORIQUE
- */
-function terminerPartie() {
+function terminerPartie() { /* ... (inchangé) ... */
     sequenceForceStop = false;
     validerTourBouton.disabled = true;
     arreterMaintenantBouton.disabled = true;
-
     const graphContainer = document.querySelector('.graphique-container');
     if (graphContainer) {
         graphContainer.classList.remove('cache');
     }
-
-     // --- ÉTAPE 1: Calculer le classement final AVEC les rangs ---
     let joueursTries = [...joueurs].sort((a, b) => {
         return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal;
     });
-    classementFinal = calculerRangs(joueursTries); // Stocke le résultat globalement
-    
-    // --- NOUVELLE ÉTAPE: Sauvegarder dans l'historique ---
+    classementFinal = calculerRangs(joueursTries);
     sauvegarderHistoriquePartie(classementFinal);
-    // --- Fin de la nouvelle étape ---
-
-    // --- ÉTAPE 2: Gérer le cas secret ---
     if (scoresSecrets) {
         scoresSecrets = false;
-        // Met à jour l'affichage du tableau pour montrer les scores et les RANGS calculés
-        mettreAJourScoresAffichage(); // Va utiliser classementFinal implicitement via le tri
-
-        // Reconstruit le graphique car il était caché
+        mettreAJourScoresAffichage();
         if (monGraphique) {
             monGraphique.data.labels = ['Manche 0'];
             monGraphique.data.datasets.forEach(dataset => { dataset.data = [0]; });
@@ -392,14 +315,10 @@ function terminerPartie() {
             monGraphique.update();
             monGraphique.resize();
         }
-
         alert("FIN DE PARTIE : Les scores secrets sont révélés !");
-        // Lance la séquence APRÈS l'alerte
         setTimeout(demarrerSequenceReveal, 100);
     } else {
-        // Si pas secret, met à jour l'affichage avec les rangs
          mettreAJourScoresAffichage();
-        // Lance la séquence directement
         demarrerSequenceReveal();
     }
 }
@@ -407,21 +326,17 @@ function terminerPartie() {
 
 // --- FONCTIONS GRAPHIQUE ---
 
-// (Fonction genererCouleurAleatoire - Corrigée)
-function genererCouleurAleatoire() {
+function genererCouleurAleatoire() { /* ... (inchangé - corrigé) ... */
     const couleurs = [ '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#8036EB', '#FFAB91', '#81D4FA', '#FFF59D', '#A5D6A7' ];
     let couleursPrises = joueurs.map(j => j.couleur.toUpperCase()); 
-    // Correction de la faute de frappe "coueursPrises" -> "couleursPrises"
     let couleurDispo = couleurs.find(c => !couleursPrises.includes(c)); 
     if (couleurDispo) { return couleurDispo; } return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
 }
-// (Fonction creerGraphique - Inchangée)
 function creerGraphique() { /* ... (inchangé) ... */
     if (monGraphique) { monGraphique.destroy(); }
     const datasets = joueurs.map((joueur, index) => ({ label: joueur.nom, data: [0], borderColor: joueur.couleur, backgroundColor: joueur.couleur + '33', fill: false, tension: 0.1 }));
     monGraphique = new Chart(canvasGraphique, { type: 'line', data: { labels: ['Manche 0'], datasets: datasets }, options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: false } }, scales: { y: { title: { display: true, text: 'Points' } }, x: { title: { display: true, text: 'Manches' } } } } });
 }
-// (Fonction mettreAJourGraphique - Inchangée, le correctif précédent était OK)
 function mettreAJourGraphique() { /* ... (inchangé) ... */
      if (!monGraphique) { return; }
      const labelManche = 'Manche ' + mancheActuelle;
@@ -432,8 +347,47 @@ function mettreAJourGraphique() { /* ... (inchangé) ... */
              else { monGraphique.data.datasets[index].data[mancheActuelle] = joueur.scoreTotal; }
          }
      });
-     // Ne pas bloquer l'update, même si caché. La reconstruction à la fin gère le visuel.
      monGraphique.update();
+}
+
+function recreerGraphiqueFinal() { /* ... (inchangé) ... */
+    const graphContainer = document.querySelector('.graphique-container');
+    const graphPlaceholder = document.getElementById('graphique-final-container');
+    if (graphContainer && graphPlaceholder) {
+        if (!graphPlaceholder.contains(graphContainer)) {
+            graphPlaceholder.innerHTML = '';
+            graphPlaceholder.appendChild(graphContainer);
+        }
+    }
+    if (monGraphique) { monGraphique.destroy(); }
+    const datasets = joueurs.map((joueur, index) => ({ 
+        label: joueur.nom, 
+        data: [0], 
+        borderColor: joueur.couleur, 
+        backgroundColor: joueur.couleur + '33', 
+        fill: false, 
+        tension: 0.1 
+    }));
+    monGraphique = new Chart(canvasGraphique, { 
+        type: 'line', 
+        data: { labels: ['Manche 0'], datasets: datasets }, 
+        options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { title: { display: true, text: 'Points' } }, x: { title: { display: true, text: 'Manches' } } } } 
+    });
+    let scoreCumules = new Array(joueurs.length).fill(0);
+    for (let i = 0; i < mancheActuelle; i++) {
+        if(monGraphique.data.labels.length <= i + 1) { 
+            monGraphique.data.labels.push(`Manche ${i + 1}`); 
+        }
+        joueurs.forEach((joueur, index) => {
+            const scoreDeCeTour = (joueur.scoresTour && joueur.scoresTour[i]) ? joueur.scoresTour[i] : 0;
+            scoreCumules[index] += scoreDeCeTour;
+            if(monGraphique.data.datasets[index]) {
+                monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
+            }
+        });
+    }
+    monGraphique.update();
+    monGraphique.resize();
 }
 
 
@@ -442,29 +396,75 @@ function mettreAJourGraphique() { /* ... (inchangé) ... */
 // (Activation/désactivation des inputs numériques - Inchangé)
 conditionCheckboxes.forEach(checkbox => { /* ... (inchangé) ... */
     checkbox.addEventListener('change', (e) => { const type = e.target.dataset.type; const inputId = inputIdMap[type]; const input = document.getElementById(inputId); if (input) { input.disabled = !checkbox.checked; } mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
-// (Mise à jour si changement de valeur numérique - Inchangé)
 [scoreLimiteInput, scoreRelatifInput, nbManchesTotalInput, nbManchesRestantesInput].forEach(input => { /* ... (inchangé) ... */ input.addEventListener('change', () => { mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
-// (Fonction mettreAJourConditionsArret - Inchangée)
 function mettreAJourConditionsArret() { /* ... (inchangé) ... */
     for (const key in conditionsArret) { conditionsArret[key].active = false; }
     document.querySelectorAll('.condition-checkbox:checked').forEach(checkbox => { const type = checkbox.dataset.type; conditionsArret[type].active = true; const inputId = inputIdMap[type]; const inputElement = document.getElementById(inputId); const valeur = parseInt(inputElement.value, 10) || 0; if (type === 'score_limite') { conditionsArret.score_limite.valeur = valeur; } else if (type === 'score_relatif') { conditionsArret[type].valeur = valeur; joueurs.forEach(j => { j.scoreRelatifPivot = j.scoreTotal; }); } else if (type === 'manche_total') { conditionsArret.manche_total.mancheCible = valeur; } else if (type === 'manche_restante') { conditionsArret.manche_restante.mancheCible = mancheActuelle + valeur; } });
 }
 
 // (Ajout d'un joueur - Inchangé)
-ajouterBouton.addEventListener('click', () => { /* ... (inchangé) ... */
+ajouterBouton.addEventListener('click', () => {
     const nom = nomJoueurInput.value.trim(); const couleur = couleurJoueurInput.value;
-    if (nom && !joueurs.some(j => j.nom === nom)) { joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0 }); nomJoueurInput.value = ''; couleurJoueurInput.value = genererCouleurAleatoire(); mettreAJourListeJoueurs(); verifierPeutDemarrer(); }
+    if (nom && !joueurs.some(j => j.nom === nom)) { 
+        joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0, rang: null }); 
+        nomJoueurInput.value = ''; 
+        couleurJoueurInput.value = genererCouleurAleatoire(); 
+        mettreAJourListeJoueurs(); 
+        verifierPeutDemarrer(); 
+    }
     else if (joueurs.some(j => j.nom === nom)) { alert(`Le joueur "${nom}" existe déjà !`); }
 });
 nomJoueurInput.addEventListener('keypress', (e) => { /* ... (inchangé) ... */ if (e.key === 'Enter') { ajouterBouton.click(); } });
 
-// (Démarrage de la partie - Inchangé)
-demarrerBouton.addEventListener('click', () => { /* ... (inchangé) ... */
-    sequenceForceStop = false; if (joueurs.length < 2) return; scoresSecrets = modeSecretConfig.checked; const victoireChoix = document.querySelector('input[name="condition-victoire"]:checked').value; lowScoreWins = (victoireChoix === 'low'); mancheActuelle = 0;
-    joueurs.forEach(j => { j.scoreTotal = 0; j.scoresTour = []; j.scoreRelatifPivot = 0; j.rang = null; }); // Nettoie le rang
-    const graphContainer = document.querySelector('.graphique-container'); const graphOriginalParent = document.querySelector('.score-gauche'); const inputTourDiv = document.querySelector('.input-tour');
-    if (graphContainer && graphOriginalParent && inputTourDiv) { graphOriginalParent.insertBefore(graphContainer, inputTourDiv); }
-    podiumEcran.classList.add('cache'); revealEcran.classList.add('cache');
+// (Démarrage de la partie - MODIFIÉ pour mémoriser les joueurs)
+demarrerBouton.addEventListener('click', () => {
+    sequenceForceStop = false; if (joueurs.length < 2) return; 
+    
+    nomJeuActuel = nomJeuConfigInput.value.trim() || "Partie";
+    scoresSecrets = modeSecretConfig.checked; 
+    const victoireChoix = document.querySelector('input[name="condition-victoire"]:checked').value; 
+    lowScoreWins = (victoireChoix === 'low'); 
+    mancheActuelle = 0;
+    
+    joueurs.forEach(j => { 
+        j.scoreTotal = 0; 
+        j.scoresTour = []; 
+        j.scoreRelatifPivot = 0; 
+        j.rang = null; 
+    }); 
+    
+    // NOUVEAU : Mémorise les joueurs et leurs couleurs
+    if (currentUser) {
+        const userRef = db.collection('utilisateurs').doc(currentUser.uid);
+        const joueursRecentsRef = userRef.collection('joueursRecents');
+        joueurs.forEach(j => {
+            // Utilise set() avec le nom comme ID pour créer/mettre à jour
+            joueursRecentsRef.doc(j.nom).set({ nom: j.nom, couleur: j.couleur });
+        });
+        
+        // Met à jour la liste locale pour la prochaine fois
+        joueurs.forEach(j => {
+            const index = joueursRecents.findIndex(jr => jr.nom === j.nom);
+            if (index > -1) {
+                joueursRecents[index].couleur = j.couleur; // Met à jour couleur
+            } else {
+                joueursRecents.push({ nom: j.nom, couleur: j.couleur }); // Ajoute nouveau
+            }
+        });
+        afficherSuggestionsJoueurs(); // Rafraîchit l'UI
+    }
+    
+    const graphContainer = document.querySelector('.graphique-container'); 
+    const graphOriginalParent = document.querySelector('.score-gauche'); 
+    const inputTourDiv = document.querySelector('.input-tour');
+    if (graphContainer && graphOriginalParent && inputTourDiv) { 
+        graphOriginalParent.insertBefore(graphContainer, inputTourDiv); 
+    }
+    
+    podiumEcran.classList.add('cache'); 
+    revealEcran.classList.add('cache');
+    // On ne cache plus le bouton retour : retourAccueilBtn.classList.add('cache');
+    
     if (scoresSecrets) { if (graphContainer) graphContainer.classList.add('cache'); } else { if (graphContainer) graphContainer.classList.remove('cache'); }
     mettreAJourConditionsArret(); configEcran.classList.add('cache'); scoreEcran.classList.remove('cache');
     genererChampsSaisie(); mettreAJourScoresAffichage(); mettreAJourCompteurs(); creerGraphique();
@@ -480,9 +480,32 @@ validerTourBouton.addEventListener('click', () => { /* ... (inchangé) ... */
 // (Arrêt manuel - Inchangé)
 arreterMaintenantBouton.addEventListener('click', terminerPartie);
 
-// (Événements de Skip - Inchangés)
+// (Événements de Skip - MODIFIÉ pour afficher le bouton retour)
 revealEcran.addEventListener('click', (e) => { /* ... (inchangé) ... */ if (e.target.closest('#skip-all-btn') || e.target.closest('#reveal-content')) { return; } if (currentStepSkipper) { currentStepSkipper(); } });
-skipAllBtn.addEventListener('click', () => { /* ... (inchangé) ... */ sequenceForceStop = true; if (currentStepSkipper) { currentStepSkipper(); } revealEcran.classList.add('cache'); podiumEcran.classList.remove('cache'); construirePodiumFinal(); });
+skipAllBtn.addEventListener('click', () => {
+    sequenceForceStop = true; 
+    if (currentStepSkipper) { currentStepSkipper(); } 
+    revealEcran.classList.add('cache'); 
+    podiumEcran.classList.remove('cache');
+    retourAccueilBtn.classList.remove('cache'); // Affiche le bouton retour
+    construirePodiumFinal(); 
+});
+
+// (Bouton "Retour à l'accueil" - Inchangé, gère tous les cas)
+retourAccueilBtn.addEventListener('click', () => {
+    podiumEcran.classList.add('cache');
+    userEcran.classList.remove('cache');
+    const graphContainer = document.querySelector('.graphique-container');
+    const graphOriginalParent = document.querySelector('.score-gauche');
+    const inputTourDiv = document.querySelector('.input-tour');
+    if (graphContainer && graphOriginalParent && inputTourDiv) {
+        graphOriginalParent.insertBefore(graphContainer, inputTourDiv);
+        if (monGraphique) {
+            monGraphique.destroy(); 
+            monGraphique = null;
+        }
+    }
+});
 
 
 // --- INITIALISATION ---
@@ -499,91 +522,62 @@ couleurJoueurInput.value = genererCouleurAleatoire();
 
 // --- 1. Références Firebase (Auth) et Variables d'état ---
 
-// 'db' est déjà défini dans ton HTML. Nous ajoutons 'auth'.
 const auth = firebase.auth(); 
-
-// Nouveaux sélecteurs d'éléments
 const authEcran = document.getElementById('auth-ecran');
 const userEcran = document.getElementById('user-ecran');
 const userEmail = document.getElementById('user-email');
 const authErreur = document.getElementById('auth-erreur');
 const listePartiesSauvegardees = document.getElementById('liste-parties-sauvegardees');
-const listeHistoriqueParties = document.getElementById('liste-historique-parties'); // NOUVEAU
+const listeHistoriqueParties = document.getElementById('liste-historique-parties');
 const lancerNouvellePartieBtn = document.getElementById('lancer-nouvelle-partie-btn');
-
-// Boutons d'authentification
 const signupBtn = document.getElementById('auth-signup');
 const loginBtn = document.getElementById('auth-login');
 const logoutBtn = document.getElementById('auth-logout');
-
-// Bouton de sauvegarde
 const sauvegarderBtn = document.getElementById('sauvegarder-partie');
 const saveFeedback = document.getElementById('save-feedback');
-
-// ID de la partie en cours pour les mises à jour
 let partieIdActuelle = null; 
 let currentUser = null;
 
 
 // --- 2. Fonctions d'Authentification ---
 
-// Fonction pour afficher les erreurs
-function afficherAuthErreur(message) {
+function afficherAuthErreur(message) { /* ... (inchangé) ... */
     authErreur.textContent = message;
     authErreur.classList.remove('cache');
 }
-
-// Créer un compte
-signupBtn.addEventListener('click', () => {
+signupBtn.addEventListener('click', () => { /* ... (inchangé) ... */
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
-    
     auth.createUserWithEmailAndPassword(email, password)
-        .catch(err => {
-            afficherAuthErreur(err.message);
-        });
+        .catch(err => { afficherAuthErreur(err.message); });
 });
-
-// Se connecter
-loginBtn.addEventListener('click', () => {
+loginBtn.addEventListener('click', () => { /* ... (inchangé) ... */
     const email = document.getElementById('auth-email').value;
     const password = document.getElementById('auth-password').value;
-    
     auth.signInWithEmailAndPassword(email, password)
-        .catch(err => {
-            afficherAuthErreur(err.message);
-        });
+        .catch(err => { afficherAuthErreur(err.message); });
 });
-
-// Se déconnecter
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', () => { /* ... (inchangé) ... */
     auth.signOut();
 });
 
 // --- 3. Gestionnaire d'état de connexion (Le Cerveau) ---
 
-// (Modifié pour charger aussi l'historique)
+// MODIFIÉ : Appelle les chargeurs de suggestions
 auth.onAuthStateChanged(user => {
     if (user) {
-        // Utilisateur connecté
         currentUser = user;
         userEmail.textContent = user.email;
-        
-        // Affiche l'écran utilisateur, cache l'authentification
         authEcran.classList.add('cache');
         userEcran.classList.remove('cache');
-        configEcran.classList.add('cache'); // Cache la config par défaut
-        scoreEcran.classList.add('cache');   // Cache le score par défaut
-
-        // Charge les parties de cet utilisateur
+        configEcran.classList.add('cache');
+        scoreEcran.classList.add('cache');
         chargerListeParties();
-        chargerHistoriqueParties(); // NOUVEAU
-
+        chargerHistoriqueParties();
+        chargerCategoriesConnues(); // NOUVEAU
+        chargerJoueursRecents(); // NOUVEAU
     } else {
-        // Utilisateur déconnecté
         currentUser = null;
-        
-        // Affiche l'écran d'authentification
         authEcran.classList.remove('cache');
         userEcran.classList.add('cache');
         configEcran.classList.add('cache');
@@ -595,61 +589,43 @@ auth.onAuthStateChanged(user => {
 
 // --- 4. Fonctions de Sauvegarde et Chargement ---
 
-// Affiche l'écran de configuration pour une NOUVELLE partie
-lancerNouvellePartieBtn.addEventListener('click', () => {
-    partieIdActuelle = null; // C'est une nouvelle partie
-    
-    // Réinitialise les joueurs (au cas où une partie était chargée)
+lancerNouvellePartieBtn.addEventListener('click', () => { /* ... (inchangé) ... */
+    partieIdActuelle = null; 
     joueurs = [];
     mancheActuelle = 0;
-    mettreAJourListeJoueurs(); // Fonction de ton script.js
-    verifierPeutDemarrer(); // Fonction de ton script.js
-
+    mettreAJourListeJoueurs();
+    verifierPeutDemarrer();
     userEcran.classList.add('cache');
     configEcran.classList.remove('cache');
 });
 
-
-// SAUVEGARDER la partie en cours
-sauvegarderBtn.addEventListener('click', async () => {
-    if (!currentUser || validerTourBouton.disabled) return; // Ne pas sauvegarder si la partie est finie
-
-    // 1. Crée un objet "état de la partie"
+sauvegarderBtn.addEventListener('click', async () => { /* ... (inchangé) ... */
+    if (!currentUser || validerTourBouton.disabled) return;
     const etatPartie = {
-        joueurs: joueurs, // Ton tableau global de joueurs
+        joueurs: joueurs,
         mancheActuelle: mancheActuelle,
         scoresSecrets: scoresSecrets,
         lowScoreWins: lowScoreWins,
         conditionsArret: conditionsArret,
         dernierSauvegarde: new Date().toISOString()
     };
-
-    // 2. Prépare la référence de la base de données
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
     const partiesRef = userRef.collection('parties');
-    
     sauvegarderBtn.disabled = true;
     saveFeedback.textContent = "Sauvegarde en cours...";
     saveFeedback.classList.remove('cache');
-
     try {
         if (partieIdActuelle) {
-            // METTRE À JOUR une partie existante
             await partiesRef.doc(partieIdActuelle).set(etatPartie, { merge: true });
         } else {
-            // CRÉER une nouvelle sauvegarde de partie
             const docRef = await partiesRef.add(etatPartie);
-            partieIdActuelle = docRef.id; // Mémorise l'ID pour la prochaine sauvegarde
+            partieIdActuelle = docRef.id;
         }
-        
         saveFeedback.textContent = "Partie sauvegardée !";
         setTimeout(() => saveFeedback.classList.add('cache'), 2000);
-        
-        // Met à jour la liste des parties (si on est sur l'écran d'accueil)
         if (!userEcran.classList.contains('cache')) {
             chargerListeParties();
         }
-
     } catch (err) {
         console.error("Erreur de sauvegarde: ", err);
         saveFeedback.textContent = "Erreur de sauvegarde.";
@@ -659,27 +635,20 @@ sauvegarderBtn.addEventListener('click', async () => {
 });
 
 
-// CHARGER la liste des parties sauvegardées
-function chargerListeParties() {
+function chargerListeParties() { /* ... (inchangé) ... */
     if (!currentUser) return;
-    
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
     listePartiesSauvegardees.innerHTML = "Chargement...";
-    
-    userRef.collection('parties')
-           .orderBy('dernierSauvegarde', 'desc') // Optionnel: trie par date
-           .get()
+    userRef.collection('parties').orderBy('dernierSauvegarde', 'desc').get()
            .then(querySnapshot => {
                if (querySnapshot.empty) {
                    listePartiesSauvegardees.innerHTML = "<p>Aucune partie en cours.</p>";
                    return;
                }
-               
-               listePartiesSauvegardees.innerHTML = ""; // Vide la liste
+               listePartiesSauvegardees.innerHTML = "";
                querySnapshot.forEach(doc => {
                    const partie = doc.data();
                    const nomsJoueurs = partie.joueurs.map(j => j.nom).join(', ');
-                   
                    const div = document.createElement('div');
                    div.innerHTML = `
                        <strong>Manche ${partie.mancheActuelle}</strong> (${nomsJoueurs})
@@ -695,46 +664,33 @@ function chargerListeParties() {
            });
 }
 
-// Gestion des clics sur "Charger" ou "Supprimer"
-listePartiesSauvegardees.addEventListener('click', e => {
+listePartiesSauvegardees.addEventListener('click', e => { /* ... (inchangé) ... */
     const target = e.target;
     const id = target.dataset.id;
     if (!id || !currentUser) return;
-    
     const partieRef = db.collection('utilisateurs').doc(currentUser.uid).collection('parties').doc(id);
-
     if (target.classList.contains('charger-btn')) {
-        // CHARGER une partie spécifique
         partieRef.get().then(doc => {
             if (doc.exists) {
                 const etatPartie = doc.data();
-                partieIdActuelle = doc.id; // Mémorise l'ID de la partie chargée
-                
-                // Restaure l'état global
+                partieIdActuelle = doc.id;
                 joueurs = etatPartie.joueurs;
                 mancheActuelle = etatPartie.mancheActuelle;
                 scoresSecrets = etatPartie.scoresSecrets;
                 lowScoreWins = etatPartie.lowScoreWins;
                 conditionsArret = etatPartie.conditionsArret;
-
-                // --- Reconstruit l'interface ---
                 userEcran.classList.add('cache');
                 scoreEcran.classList.remove('cache');
-                
-                // Active/Désactive les boutons de condition
                 validerTourBouton.disabled = false;
                 arreterMaintenantBouton.disabled = false;
-                
-                // Re-coche les bonnes cases de condition
                 document.querySelectorAll('.condition-checkbox').forEach(cb => {
                     const type = cb.dataset.type;
-                    if (conditionsArret[type]) { // Vérifie si la condition existe dans l'objet sauvegardé
+                    if (conditionsArret[type]) {
                         cb.checked = conditionsArret[type].active;
                         const input = document.getElementById(inputIdMap[type]);
                         if(input) {
                             input.disabled = !cb.checked;
                             if (type.includes('manche')) {
-                               // On ne peut pas restaurer la valeur "restante", on la recalcule
                                if (type === 'manche_total') input.value = conditionsArret[type].mancheCible;
                             } else {
                                input.value = conditionsArret[type].valeur;
@@ -742,23 +698,18 @@ listePartiesSauvegardees.addEventListener('click', e => {
                         }
                     }
                 });
-
                 genererChampsSaisie();
                 mettreAJourScoresAffichage();
                 creerGraphique();
-                
-                // Re-popule l'historique du graphique
                 if (!scoresSecrets) {
                     let scoreCumules = new Array(joueurs.length).fill(0);
-                    // S'assure que le graphique a le bon nombre de datasets
                     if (monGraphique.data.datasets.length !== joueurs.length) {
-                        creerGraphique(); // Recrée le graphique si le nombre de joueurs a changé
+                        creerGraphique();
                     }
-                    
                     for (let i = 0; i < mancheActuelle; i++) {
                         if(monGraphique.data.labels.length <= i + 1) { monGraphique.data.labels.push(`Manche ${i + 1}`); }
                         joueurs.forEach((joueur, index) => {
-                            const scoreDeCeTour = joueur.scoresTour[i] || 0;
+                            const scoreDeCeTour = (joueur.scoresTour && joueur.scoresTour[i]) ? joueur.scoresTour[i] : 0;
                             scoreCumules[index] += scoreDeCeTour;
                              if(monGraphique.data.datasets[index]) {
                                 monGraphique.data.datasets[index].data[i+1] = scoreCumules[index];
@@ -767,58 +718,51 @@ listePartiesSauvegardees.addEventListener('click', e => {
                     }
                     monGraphique.update();
                 }
-                
-                mettreAJourCompteurs(); // Doit être appelé après la restauration
+                mettreAJourCompteurs();
             }
         });
-        
     } else if (target.classList.contains('supprimer-btn')) {
-        // SUPPRIMER une partie
         if (confirm("Voulez-vous vraiment supprimer cette sauvegarde ?")) {
             partieRef.delete().then(() => {
-                chargerListeParties(); // Rafraîchit la liste
+                chargerListeParties();
             });
         }
     }
 });
 
-// --- 5. NOUVELLES Fonctions pour l'HISTORIQUE ---
+// --- 5. Fonctions pour l'HISTORIQUE (Modifiées) ---
 
-/**
- * NOUVEAU : Sauvegarde le classement final dans l'historique
- * et supprime la partie "en cours".
- */
+// MODIFIÉ : Met à jour la liste des catégories connues
 async function sauvegarderHistoriquePartie(classement) {
-    if (!currentUser) return; // Pas connecté, ne peut pas sauvegarder
-
+    if (!currentUser) return; 
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
     const historiqueRef = userRef.collection('historique');
-
-    // Crée un objet simple pour l'historique
     const entreeHistorique = {
         date: new Date().toISOString(),
-        classement: classement // C'est le tableau [joueurs...] avec rangs et scores
+        nomJeu: nomJeuActuel,
+        classement: classement,
+        joueursComplets: joueurs,
+        manches: mancheActuelle,
+        lowScoreWins: lowScoreWins
     };
-
     try {
-        // Ajoute à l'historique
         await historiqueRef.add(entreeHistorique);
         console.log("Historique de partie sauvegardé !");
         
-        // Rafraîchit la liste de l'historique sur l'écran d'accueil
+        // NOUVEAU : Met à jour la datalist si c'est un nouveau jeu
+        if (!categoriesJeuxConnues.includes(nomJeuActuel)) {
+            categoriesJeuxConnues.push(nomJeuActuel);
+            mettreAJourDatalistJeux();
+        }
+        
         if (!userEcran.classList.contains('cache')) {
             chargerHistoriqueParties();
         }
-
-        // Si cette partie était une partie "sauvegardée" (en cours),
-        // on la supprime maintenant qu'elle est terminée.
         if (partieIdActuelle) {
             const partieEnCoursRef = userRef.collection('parties').doc(partieIdActuelle);
             await partieEnCoursRef.delete();
-            partieIdActuelle = null; // Vide l'ID
+            partieIdActuelle = null;
             console.log("Partie 'en cours' supprimée et transférée à l'historique.");
-            
-            // Rafraîchit aussi la liste des parties en cours
              if (!userEcran.classList.contains('cache')) {
                 chargerListeParties();
              }
@@ -828,80 +772,205 @@ async function sauvegarderHistoriquePartie(classement) {
     }
 }
 
-/**
- * NOUVEAU : Charge l'historique des parties terminées
- */
-function chargerHistoriqueParties() {
+async function chargerHistoriqueParties() { /* ... (inchangé) ... */
     if (!currentUser) return;
-    
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
     listeHistoriqueParties.innerHTML = "Chargement...";
-    
-    userRef.collection('historique')
-           .orderBy('date', 'desc') // Montre les plus récentes en premier
-           .limit(20) // Limite aux 20 dernières parties
-           .get()
-           .then(querySnapshot => {
-               if (querySnapshot.empty) {
-                   listeHistoriqueParties.innerHTML = "<p>Aucun historique de partie.</p>";
-                   return;
-               }
-               
-               listeHistoriqueParties.innerHTML = ""; // Vide la liste
-               querySnapshot.forEach(doc => {
-                   const partie = doc.data();
-                   const docId = doc.id;
-                   
-                   // Formatte le texte du podium
-                   let podiumTexte = partie.classement.map(j => {
-                       let medaille = '';
-                       if (j.rang === 1) medaille = '🥇';
-                       else if (j.rang === 2) medaille = '🥈';
-                       else if (j.rang === 3) medaille = '🥉';
-                       else medaille = `<strong>${j.rang}.</strong>`;
-                       
-                       return `${medaille} ${j.nom} (${j.scoreTotal} pts)`;
-                   }).join(', ');
+    try {
+        const querySnapshot = await userRef.collection('historique').orderBy('date', 'desc').get();
+        if (querySnapshot.empty) {
+            listeHistoriqueParties.innerHTML = "<p>Aucun historique de partie.</p>";
+            return;
+        }
+        const partiesParJeu = {};
+        querySnapshot.forEach(doc => {
+            const partie = doc.data();
+            partie.id = doc.id;
+            const nomJeu = partie.nomJeu || "Parties";
+            if (!partiesParJeu[nomJeu]) {
+                partiesParJeu[nomJeu] = [];
+            }
+            partiesParJeu[nomJeu].push(partie);
+        });
+        listeHistoriqueParties.innerHTML = "";
+        const nomsJeuxTries = Object.keys(partiesParJeu).sort((a, b) => a.localeCompare(b));
+        nomsJeuxTries.forEach(nomJeu => {
+            const parties = partiesParJeu[nomJeu];
+            const detailsJeu = document.createElement('details');
+            detailsJeu.className = 'groupe-jeu';
+            detailsJeu.open = true;
+            const summaryJeu = document.createElement('summary');
+            summaryJeu.className = 'groupe-jeu-summary';
+            summaryJeu.textContent = `${nomJeu} (${parties.length} partie${parties.length > 1 ? 's' : ''})`;
+            detailsJeu.appendChild(summaryJeu);
+            const contenuJeu = document.createElement('div');
+            contenuJeu.className = 'partie-historique-contenu';
+            parties.forEach(partie => {
+                const vainqueurs = partie.classement.filter(j => j.rang === 1);
+                const vainqueurNoms = vainqueurs.map(v => v.nom).join(' & ') || 'N/A';
+                const datePartie = new Date(partie.date).toLocaleDateString('fr-FR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                });
+                const div = document.createElement('div');
+                div.className = 'partie-historique';
+                div.innerHTML = `
+                    <span><strong>${datePartie}</strong> - Vainqueur(s): ${vainqueurNoms}</span>
+                    <div>
+                        <button class="voir-hist-btn" data-id="${partie.id}" title="Voir le podium">Voir</button>
+                        <button class="supprimer-hist-btn" data-id="${partie.id}" title="Supprimer de l'historique">&times;</button>
+                    </div>
+                `;
+                contenuJeu.appendChild(div);
+            });
+            detailsJeu.appendChild(contenuJeu);
+            listeHistoriqueParties.appendChild(detailsJeu);
+        });
+    } catch (err) {
+        console.error("Erreur chargement historique: ", err);
+        listeHistoriqueParties.innerHTML = "<p>Erreur lors du chargement.</p>";
+    }
+}
 
-                   // Formatte la date
-                   const datePartie = new Date(partie.date).toLocaleDateString('fr-FR', {
-                       day: 'numeric', month: 'short', year: 'numeric' 
-                   });
+listeHistoriqueParties.addEventListener('click', async (e) => { /* ... (inchangé) ... */
+    const target = e.target;
+    const id = target.dataset.id;
+    if (!id || !currentUser) return;
+    if (target.classList.contains('supprimer-hist-btn')) {
+        const histRef = db.collection('utilisateurs').doc(currentUser.uid).collection('historique').doc(id);
+        if (confirm("Voulez-vous vraiment supprimer cette partie de l'historique ?")) {
+            try {
+                await histRef.delete();
+                chargerHistoriqueParties();
+            } catch (err) {
+                console.error("Erreur de suppression: ", err);
+                alert("Une erreur est survenue.");
+            }
+        }
+    }
+    if (target.classList.contains('voir-hist-btn')) {
+        const histRef = db.collection('utilisateurs').doc(currentUser.uid).collection('historique').doc(id);
+        try {
+            const doc = await histRef.get();
+            if (doc.exists) {
+                const partieData = doc.data();
+                classementFinal = partieData.classement;
+                joueurs = partieData.joueursComplets;
+                lowScoreWins = partieData.lowScoreWins;
+                mancheActuelle = partieData.manches;
+                userEcran.classList.add('cache');
+                podiumEcran.classList.remove('cache');
+                retourAccueilBtn.classList.remove('cache');
+                construirePodiumFinal();
+                recreerGraphiqueFinal();
+            } else {
+                alert("Impossible de trouver cette partie.");
+            }
+        } catch (err) {
+            console.error("Erreur pour voir l'historique: ", err);
+            alert("Erreur lors du chargement de la partie.");
+        }
+    }
+});
 
-                   const div = document.createElement('div');
-                   div.className = 'partie-historique';
-                   div.innerHTML = `
-                       <span><strong>${datePartie} :</strong> ${podiumTexte}</span>
-                       <button class="supprimer-hist-btn" data-id="${docId}" title="Supprimer de l'historique">&times;</button>
-                   `;
-                   listeHistoriqueParties.appendChild(div);
-               });
-           })
-           .catch(err => {
-               console.error("Erreur chargement historique: ", err);
-               listeHistoriqueParties.innerHTML = "<p>Erreur lors du chargement.</p>";
-           });
+
+// --- 6. NOUVELLES Fonctions pour les SUGGESTIONS ---
+
+/**
+ * NOUVEAU : Remplit la datalist des noms de jeux
+ */
+function mettreAJourDatalistJeux() {
+    datalistJeux.innerHTML = ''; // Vide la liste
+    categoriesJeuxConnues.forEach(nomJeu => {
+        const option = document.createElement('option');
+        option.value = nomJeu;
+        datalistJeux.appendChild(option);
+    });
 }
 
 /**
- * NOUVEAU : Gère la suppression d'un item de l'historique
+ * NOUVEAU : Charge les catégories de jeux uniques depuis l'historique
  */
-listeHistoriqueParties.addEventListener('click', e => {
-    const target = e.target;
-    const id = target.dataset.id;
-    // Vérifie qu'on clique bien sur le bouton supprimer
-    if (!id || !currentUser || !target.classList.contains('supprimer-hist-btn')) {
+async function chargerCategoriesConnues() {
+    if (!currentUser) return;
+    const userRef = db.collection('utilisateurs').doc(currentUser.uid);
+    
+    try {
+        const querySnapshot = await userRef.collection('historique').get();
+        const nomsJeux = new Set(); // Utilise un Set pour éviter les doublons
+        querySnapshot.forEach(doc => {
+            const nomJeu = doc.data().nomJeu;
+            if (nomJeu) {
+                nomsJeux.add(nomJeu);
+            }
+        });
+        categoriesJeuxConnues = [...nomsJeux].sort(); // Convertit en tableau trié
+        mettreAJourDatalistJeux();
+    } catch (err) {
+        console.error("Erreur chargement catégories: ", err);
+    }
+}
+
+/**
+ * NOUVEAU : Affiche les étiquettes de joueurs récents
+ */
+function afficherSuggestionsJoueurs() {
+    listeSuggestionsJoueurs.innerHTML = ''; // Vide la liste
+    if (joueursRecents.length === 0) {
+        suggestionsJoueursDiv.classList.add('cache');
         return;
     }
     
-    const histRef = db.collection('utilisateurs').doc(currentUser.uid).collection('historique').doc(id);
+    suggestionsJoueursDiv.classList.remove('cache');
+    joueursRecents.sort((a,b) => a.nom.localeCompare(b.nom)).forEach(joueur => {
+        const tag = document.createElement('div');
+        tag.className = 'joueur-suggestion-tag';
+        // Stocke les données dans le HTML
+        tag.dataset.nom = joueur.nom;
+        tag.dataset.couleur = joueur.couleur;
+        
+        tag.innerHTML = `
+            <span class="joueur-couleur-swatch" style="background-color: ${joueur.couleur};"></span>
+            <span>${joueur.nom}</span>
+        `;
+        listeSuggestionsJoueurs.appendChild(tag);
+    });
+}
 
-    if (confirm("Voulez-vous vraiment supprimer cette partie de l'historique ?")) {
-        histRef.delete().then(() => {
-            chargerHistoriqueParties(); // Rafraîchit la liste
-        }).catch(err => {
-            console.error("Erreur de suppression: ", err);
-            alert("Une erreur est survenue.");
+/**
+ * NOUVEAU : Charge les joueurs récents depuis la BDD
+ */
+async function chargerJoueursRecents() {
+    if (!currentUser) return;
+    const userRef = db.collection('utilisateurs').doc(currentUser.uid);
+    
+    try {
+        const querySnapshot = await userRef.collection('joueursRecents').get();
+        joueursRecents = []; // Réinitialise
+        querySnapshot.forEach(doc => {
+            joueursRecents.push(doc.data());
         });
+        afficherSuggestionsJoueurs();
+    } catch (err) {
+        console.error("Erreur chargement joueurs récents: ", err);
+    }
+}
+
+/**
+ * NOUVEAU : Gère le clic sur une suggestion de joueur
+ */
+listeSuggestionsJoueurs.addEventListener('click', (e) => {
+    const tag = e.target.closest('.joueur-suggestion-tag');
+    if (tag) {
+        const nom = tag.dataset.nom;
+        const couleur = tag.dataset.couleur;
+        
+        // Pré-remplit les champs
+        nomJoueurInput.value = nom;
+        couleurJoueurInput.value = couleur;
+        
+        // Bonus : Tente d'ajouter directement le joueur
+        // ajouterBouton.click(); 
+        // -> Je le laisse en commentaire, c'est mieux de laisser l'utilisateur
+        // cliquer sur "Ajouter" lui-même, au cas où il veuille changer la couleur.
     }
 });
