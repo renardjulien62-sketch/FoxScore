@@ -406,3 +406,28 @@ button:disabled {
 #liste-parties-sauvegardees button.supprimer-btn {
     background-color: #dc3545;
 }
+
+/* NOUVEAU : Styles pour l'historique */
+#liste-historique-parties .partie-historique {
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    border-radius: 5px;
+    display: flex; /* Pour aligner le bouton supprimer */
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+}
+#liste-historique-parties .partie-historique span {
+    flex-grow: 1; /* Prend la place restante */
+    word-break: break-word; /* Évite le débordement */
+}
+#liste-historique-parties .partie-historique button {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    background-color: #dc3545; /* Rouge pour supprimer */
+    flex-shrink: 0; /* Empêche le bouton de rétrécir */
+    margin: 0;
+}
