@@ -406,7 +406,7 @@ function terminerPartie() {
 // (Fonction genererCouleurAleatoire - Inchangée)
 function genererCouleurAleatoire() { /* ... (inchangé) ... */
     const couleurs = [ '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#8036EB', '#FFAB91', '#81D4FA', '#FFF59D', '#A5D6A7' ];
-    let couleursPrises = joueurs.map(j => j.couleur.toUpperCase()); let couleurDispo = couleurs.find(c => !coueursPrises.includes(c));
+    let couleursPrises = joueurs.map(j => j.couleur.toUpperCase()); let couleurDispo = couleurs.find(c => !couleursPrises.includes(c));
     if (couleurDispo) { return couleurDispo; } return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
 }
 // (Fonction creerGraphique - Inchangée)
