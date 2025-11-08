@@ -60,19 +60,14 @@
                     <div id="liste-suggestions-joueurs" style="width: 100%;"></div>
                 </div>
                 <div id="liste-joueurs-conf" class="input-group"></div>
-
                 <div class="input-group">
-                    
                     <h3 style="width: 100%; margin-bottom: 10px; color: #000;">Paramètres de partie</h3>
                     <hr class="divider">
-
                     <div class="settings-options-wrapper">
-                        
                         <div class="setting-item inline">
                             <input type="checkbox" id="mode-secret-config">
                             <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
                         </div>
-                        
                         <div class="setting-item">
                             <label class="setting-title">Objectif du jeu :</label>
                             <div class="radio-option">
@@ -85,10 +80,8 @@
                             </div>
                         </div>
                     </div> 
-
                     <button id="demarrer-partie" disabled>Démarrer la partie</button>
                 </div>
-
             </div>
 
             <div id="page-ongoing-games" class="page-content cache">
@@ -96,8 +89,23 @@
                 <div id="liste-parties-sauvegardees"></div>
             </div>
 
+
             <div id="page-history-grid" class="page-content cache">
                 <h2>Mon Historique</h2>
+                <div class="stats-container">
+                    <div id="stats-top-jeux" class="input-group">
+                        <h3>🏆 Top Jeux (Perf.)</h3>
+                        <ol></ol>
+                    </div>
+                    <div id="stats-jeux-frequence" class="input-group">
+                        <h3>🗓️ Jeux les Plus Joués</h3>
+                        <ol></ol>
+                    </div>
+                    <div id="stats-joueurs-podium" class="input-group">
+                        <h3>👥 Top Joueurs</h3>
+                        <ol></ol>
+                    </div>
+                </div>
                 <p>Cliquez sur un jeu pour voir toutes les parties jouées.</p>
                 <div id="history-grid-jeux">
                     </div>
@@ -106,6 +114,23 @@
             <div id="page-history-details" class="page-content cache">
                 <button id="history-back-btn" class="bouton-simple">&larr; Retour à l'historique</button>
                 <h2 id="history-details-title">Historique pour...</h2>
+                
+                <div id="history-details-chart-controls" class="input-group">
+                    <h3>Analyse de position</h3>
+                    
+                    <div id="graph-players-list">
+                        </div>
+                    
+                    <div class="add-graph-player-controls">
+                        <select id="history-player-select"></select>
+                        <button id="add-player-to-graph-btn" class="bouton-simple">+</button>
+                    </div>
+
+                    <div class="graphique-container-details">
+                        <canvas id="graphique-position-details"></canvas>
+                    </div>
+                </div>
+                <h3>Toutes les parties</h3>
                 <div id="liste-historique-parties-details">
                     </div>
             </div>
@@ -160,6 +185,7 @@
                 <button id="retour-accueil-btn" class="bouton-fin" style="background-color: #6c757d; margin-top: 20px;">Retour à l'accueil</button>
             </div>
 
+
         </main> 
     </div> 
     
@@ -178,6 +204,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth-compat.js"></script>
+
     <script>
       const firebaseConfig = {
         apiKey: "AIzaSyD1cC-bahvm3fqZcsYYiBvolyaqVyMGXnI",
