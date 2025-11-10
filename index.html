@@ -30,10 +30,12 @@
         </header>
 
         <nav id="side-nav">
+            <div id="nav-logo">🦊</div>
+            
             <div id="nav-links">
+                <a href="#" class="nav-link" data-page="page-history-grid">Historique</a>
                 <a href="#" class="nav-link" data-page="page-new-game">Nouvelle Partie</a>
                 <a href="#" class="nav-link" data-page="page-ongoing-games">Parties en Cours</a>
-                <a href="#" class="nav-link" data-page="page-history-grid">Historique</a>
             </div>
             <div id="user-info-nav">
                 <p>Connecté : <strong id="user-email-nav"></strong></p>
@@ -60,14 +62,19 @@
                     <div id="liste-suggestions-joueurs" style="width: 100%;"></div>
                 </div>
                 <div id="liste-joueurs-conf" class="input-group"></div>
+
                 <div class="input-group">
+                    
                     <h3 style="width: 100%; margin-bottom: 10px; color: #000;">Paramètres de partie</h3>
                     <hr class="divider">
+
                     <div class="settings-options-wrapper">
+                        
                         <div class="setting-item inline">
                             <input type="checkbox" id="mode-secret-config">
                             <label for="mode-secret-config">Garder les scores secrets jusqu'à la fin</label>
                         </div>
+                        
                         <div class="setting-item">
                             <label class="setting-title">Objectif du jeu :</label>
                             <div class="radio-option">
@@ -80,15 +87,16 @@
                             </div>
                         </div>
                     </div> 
+
                     <button id="demarrer-partie" disabled>Démarrer la partie</button>
                 </div>
+
             </div>
 
             <div id="page-ongoing-games" class="page-content cache">
                 <h2>Mes Parties en Cours</h2>
                 <div id="liste-parties-sauvegardees"></div>
             </div>
-
 
             <div id="page-history-grid" class="page-content cache">
                 <h2>Mon Historique</h2>
@@ -119,7 +127,7 @@
                     <h3>Analyse de position</h3>
                     
                     <div id="graph-players-list">
-                        </div>
+                    </div>
                     
                     <div class="add-graph-player-controls">
                         <select id="history-player-select"></select>
@@ -130,6 +138,7 @@
                         <canvas id="graphique-position-details"></canvas>
                     </div>
                 </div>
+
                 <h3>Toutes les parties</h3>
                 <div id="liste-historique-parties-details">
                     </div>
@@ -184,7 +193,6 @@
                 <div id="graphique-final-container" class="input-group"></div>
                 <button id="retour-accueil-btn" class="bouton-fin" style="background-color: #6c757d; margin-top: 20px;">Retour à l'accueil</button>
             </div>
-
 
         </main> 
     </div> 
