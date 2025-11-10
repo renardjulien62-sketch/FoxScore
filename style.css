@@ -1,4 +1,3 @@
-/* MODIFIÉ : Import de la police "Lato" */
 @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap');
 
 /* --- NOUVELLE STRUCTURE DE BASE --- */
@@ -26,8 +25,8 @@ html, body {
     padding: 20px;
     border: 1px solid #ddd;
     background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 #auth-ecran h3 {
     width: 100%;
@@ -48,7 +47,8 @@ html, body {
     grid-row: 1 / 2;
     height: 60px;
     
-    background-color: #663C1F; 
+    /* MODIFIÉ : Couleur éclaircie comme demandé */
+    background-color: #D2B48C; /* Tan / Marron clair */
     box-shadow: none;
     
     display: flex;
@@ -61,13 +61,30 @@ html, body {
 #main-title {
     font-family: 'Lato', sans-serif;
     font-weight: 900;
-    color: #FFFFFF;
+    /* MODIFIÉ : Couleur foncée pour contraster avec le fond clair */
+    color: #3E2723;
     font-size: 2.2em;
     margin: 0;
     text-shadow: none;
 }
 
 /* 2. Menu Latéral */
+
+/* MODIFIÉ : Remplacement de l'émoji par le logo */
+#nav-logo {
+    padding: 20px 10px; /* Espace autour du logo */
+    text-align: center;
+    border-bottom: 1px solid rgba(0,0,0,0.1); /* Petite séparation */
+    margin-bottom: 10px;
+}
+#nav-logo img {
+    max-width: 100%;
+    height: auto;
+    /* Limite la largeur max pour qu'il ne soit pas énorme */
+    max-width: 180px; 
+}
+
+
 #side-nav {
     grid-column: 1 / 2;
     grid-row: 1 / 3; 
@@ -76,7 +93,7 @@ html, body {
     background-color: #D9D7B6; 
     border-right: 1px solid #000;
     
-    padding-top: 20px;
+    /* MODIFIÉ : padding-top enlevé d'ici, géré par #nav-logo */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -102,9 +119,9 @@ html, body {
 }
 .nav-link.active {
     background-color: #f0f0f0;
-    color: #007bff;
+    color: #2C5E1A;
     font-weight: 700;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid #2C5E1A;
 }
 
 #user-info-nav {
@@ -128,7 +145,7 @@ html, body {
     grid-row: 2 / 3;
     padding: 20px;
     overflow-y: auto;
-    background-color: #FFFFFF;
+    background-color: #f4f7f6;
 }
 
 /* --- STYLES DES "PAGES" --- */
@@ -157,8 +174,8 @@ h3 {
     padding: 15px;
     border: 1px solid #ddd;
     background-color: #FFFFFF;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 .input-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .label-couleur { margin-left: 5px; font-size: 0.9em; }
@@ -175,8 +192,8 @@ select {
     flex-grow: 1;
 }
 
-button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color: 0.3s; margin-top: 5px; font-weight: 700; }
-button:hover:not(:disabled) { background-color: #0056b3; }
+button { padding: 10px 15px; background-color: #2C5E1A; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color: 0.3s; margin-top: 5px; font-weight: 700; }
+button:hover:not(:disabled) { background-color: #1E4011; }
 button:disabled { background-color: #ccc; cursor: not-allowed; }
 .bouton-fin { background-color: #dc3545; margin-top: 15px; width: 100%; }
 .bouton-fin:hover { background-color: #c82333; }
@@ -261,7 +278,7 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
 .classement-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
 .classement-table th, .classement-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
 .classement-table th { background-color: #f0f0f0; }
-.score-total { font-weight: bold; color: #007bff; font-size: 1.1em; }
+.score-total { font-weight: bold; color: #2C5E1A; font-size: 1.1em; }
 
 /* --- ÉCRAN DE RÉVÉLATION (Modal) --- */
 #reveal-ecran { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75); z-index: 150; display: flex; justify-content: center; align-items: center; overflow: hidden; cursor: pointer; }
@@ -307,8 +324,24 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
 
 /* Grille d'historique */
 #history-grid-jeux { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
-.history-game-square { background-color: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; text-align: center; font-size: 1.2em; font-weight: bold; color: #2c3e50; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-.history-game-square:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.1); transform: translateY(-2px); border-color: #007bff; }
+.history-game-square { 
+    background-color: #fff; 
+    border: 1px solid #ddd; 
+    border-radius: 12px; 
+    padding: 20px; 
+    text-align: center; 
+    font-size: 1.2em; 
+    font-weight: bold; 
+    color: #2c3e50; 
+    cursor: pointer; 
+    transition: all 0.2s ease; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+}
+.history-game-square:hover { 
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08); 
+    transform: translateY(-2px); 
+    border-color: #2C5E1A; 
+}
 .history-game-square span { font-size: 0.8em; font-weight: normal; color: #555; display: block; margin-top: 5px; }
 
 /* Liste d'historique DÉTAILS - MODIFIÉ */
@@ -317,13 +350,13 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
     border: 1px solid #ddd;
     padding: 15px;
     margin-bottom: 10px;
-    border-radius: 8px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 5px;
     font-size: 0.9em;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 .partie-historique .header-info {
     display: flex;
@@ -378,7 +411,7 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
 }
 .joueur-suggestion-tag:hover { background-color: #d1d5da; }
 
-/* *** MODIFIÉS : STYLES POUR LES STATS (REQ 1 & 2) *** */
+/* --- STYLES POUR LES STATS --- */
 .stats-container {
     display: flex;
     flex-wrap: wrap;
@@ -389,7 +422,6 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
     flex: 1;
     min-width: 240px;
     margin-bottom: 0;
-    /* NOUVEAU : S'assure qu'ils ont tous le même contenu de départ */
     display: flex;
     flex-direction: column;
 }
@@ -416,7 +448,7 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
     margin-left: 5px;
 }
 
-/* *** MODIFIÉS : STYLES GRAPHIQUE (REQ 3) *** */
+/* --- STYLES GRAPHIQUE --- */
 .graphique-container-details {
     width: 100%;
     margin-top: 15px;
@@ -428,16 +460,14 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
     width: 100%;
     margin-bottom: 10px;
 }
-/* NOUVEAU : Conteneur pour les tags de joueurs */
 #graph-players-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     width: 100%;
     margin-bottom: 10px; 
-    min-height: 20px; /* Espace minimum */
+    min-height: 20px;
 }
-/* NOUVEAU : Tag de joueur pour le graphique */
 .graph-player-tag {
     display: inline-flex;
     align-items: center;
@@ -448,7 +478,6 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
     font-weight: 700;
     font-size: 0.9em;
 }
-/* Utilise le style de bouton existant */
 .graph-player-tag .bouton-retirer {
     font-size: 1.1em;
     padding-left: 8px;
@@ -457,8 +486,6 @@ button:disabled { background-color: #ccc; cursor: not-allowed; }
 .graph-player-tag .bouton-retirer:hover {
     color: #dc3545;
 }
-
-/* NOUVEAU : Conteneur pour les contrôles d'ajout */
 .add-graph-player-controls {
     display: flex;
     width: 100%;
