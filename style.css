@@ -548,5 +548,169 @@ button:disabled {
 .graph-player-tag .bouton-retirer { font-size: 1.1em; padding-left: 8px; color: #888; }
 .graph-player-tag .bouton-retirer:hover { color: #dc3545; }
 .add-graph-player-controls { display: flex; width: 100%; gap: 10px; align-items: center; }
+
+/* =============================================
+   RESPONSIVE DESIGN (VERSION MOBILE)
+   ============================================= */
+
+@media (max-width: 768px) {
+
+    /* 1. LAYOUT GÉNÉRAL : On casse la grille pour empiler les éléments */
+    #app-layout {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden; /* Empêche le double scroll */
+    }
+
+    /* 2. HEADER : Prend toute la largeur */
+    #main-header {
+        grid-column: auto;
+        grid-row: auto;
+        width: 100%;
+        padding: 0 10px;
+        box-sizing: border-box;
+    }
+    #main-title {
+        font-size: 1.5em; /* Titre un peu plus petit */
+    }
+
+    /* 3. NAVIGATION : Devient une barre horizontale en haut (sous le header) */
+    #side-nav {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 2px solid #663C1F;
+        padding: 5px;
+        flex-direction: row;
+        align-items: center;
+        overflow-x: auto; /* Permet de scroller horizontalement si le menu est long */
+        white-space: nowrap;
+        background-color: #FDFBD4; /* On garde le fond crème */
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 999;
+        flex-shrink: 0;
+    }
+
+    /* On cache le gros logo sur mobile pour gagner de la place */
+    #nav-logo {
+        display: none;
+    }
+
+    /* Liens du menu en ligne */
+    #nav-links {
+        flex-direction: row;
+        gap: 5px;
+        width: 100%;
+        justify-content: space-around; /* Répartir les liens */
+    }
+
+    .nav-link {
+        padding: 8px 10px;
+        font-size: 0.9em;
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        text-align: center;
+    }
+
+    .nav-link.active {
+        border-left: none;
+        border-bottom: 3px solid #2C5E1A;
+        background-color: transparent;
+    }
+
+    /* Infos utilisateur (email + déconnexion) masqués ou simplifiés */
+    #user-info-nav {
+        display: none; /* On cache l'email pour gagner de la place */
+    }
+    /* On pourrait ajouter un petit bouton de déconnexion dans le header plus tard si besoin */
+
+
+    /* 4. CONTENU PRINCIPAL : Prend toute la place restante */
+    #main-content {
+        width: 100%;
+        padding: 15px;
+        padding-bottom: 80px; /* Espace pour scroller jusqu'au bout */
+    }
+
+    /* 5. PAGE SCORE : Empilement vertical */
+    .score-main-container {
+        flex-direction: column-reverse; /* Contrôles en premier ou graphique en premier ? */
+        /* Ici je laisse normal : Graphique en haut, contrôles en bas */
+        flex-direction: column; 
+    }
+
+    .score-gauche, .score-droite {
+        width: 100%;
+    }
+
+    .score-droite {
+        margin-top: 20px;
+        border-top: 1px dashed #ccc;
+        padding-top: 20px;
+    }
+
+    /* 6. FORMULAIRES & INPUTS : Adaptés aux doigts */
+    .input-group, .add-player-group {
+        flex-direction: column;
+        align-items: stretch; /* Tout prend la largeur max */
+    }
+
+    .player-input-row, .player-color-row {
+        flex-wrap: wrap;
+    }
+
+    input[type="text"], 
+    input[type="number"], 
+    input[type="email"], 
+    input[type="password"], 
+    select {
+        width: 100%; /* Champs en pleine largeur */
+        box-sizing: border-box;
+        margin-bottom: 5px;
+    }
+
+    /* Boutons plus gros pour le tactile */
+    button {
+        padding: 12px 20px;
+        font-size: 1em;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    /* Boutons spécifiques (Amis, Ajout) */
+    .add-graph-player-controls button,
+    .friend-actions button {
+        width: auto; /* On garde les petits boutons carrés petits */
+    }
+
+    /* 7. STATS : Une seule colonne */
+    .stats-container {
+        flex-direction: column;
+    }
+    .stats-container .input-group {
+        width: 100%;
+    }
+
+    /* 8. TABLEAU DES SCORES */
+    .classement-table {
+        font-size: 0.9em;
+    }
+    .classement-table th, .classement-table td {
+        padding: 8px 5px;
+    }
+
+    /* 9. GRAPHIQUE */
+    .graphique-container {
+        padding: 5px;
+        overflow: hidden;
+    }
+    
+    /* 10. MODAL AUTHENTIFICATION */
+    #auth-ecran {
+        width: 95%;
+        padding: 15px;
+    }
+}
 .add-graph-player-controls select { flex-grow: 1; }
 .add-graph-player-controls button { flex-grow: 0; width: 40px; margin-top: 0; padding: 10px 0; font-size: 1.2em; }
