@@ -6,14 +6,14 @@ let lowScoreWins = true;
 let monGraphique = null;
 let classementFinal = [];
 let nomJeuActuel = "Partie";
-let categoriesJeuxConnues = []; // Pour l'autocomplétion
-let joueursRecents = []; // Pour les suggestions
-let allHistoryData = []; // Cache pour l'historique
+let categoriesJeuxConnues = []; 
+let joueursRecents = []; 
+let allHistoryData = []; 
+let mesAmis = []; 
 
 let monGraphiquePosition = null;
 let joueursSurGraphique = [];
 const COULEURS_GRAPH = ['#36A2EB', '#FF6384', '#4BC0C0', '#FFCE56', '#9966FF', '#FF9F40'];
-
 
 let sequenceForceStop = false;
 let currentStepSkipper = null;
@@ -32,7 +32,7 @@ const inputIdMap = {
     'manche_restante': 'nb-manches-restantes'
 };
 
-// --- SÉLECTION DES ÉLÉMENTS HTML (NOUVELLE STRUCTURE) ---
+// --- SÉLECTION DES ÉLÉMENTS HTML ---
 const authEcran = document.getElementById('auth-ecran');
 const appLayout = document.getElementById('app-layout');
 const userEmailNav = document.getElementById('user-email-nav');
@@ -45,7 +45,6 @@ const historyDetailsTitle = document.getElementById('history-details-title');
 const historyBackBtn = document.getElementById('history-back-btn');
 const listeHistoriquePartiesDetails = document.getElementById('liste-historique-parties-details');
 
-// Éléments des anciennes pages (maintenant dans .page-content)
 const nomJeuConfigInput = document.getElementById('nom-jeu-config');
 const datalistJeux = document.getElementById('datalist-jeux');
 const nomJoueurInput = document.getElementById('nom-joueur');
@@ -57,6 +56,8 @@ const listeJoueursConf = document.getElementById('liste-joueurs-conf');
 const scoreAffichageDiv = document.getElementById('score-affichage');
 const saisiePointsDiv = document.getElementById('saisie-points');
 const validerTourBouton = document.getElementById('valider-tour');
+const annulerTourBouton = document.getElementById('annuler-tour');
+
 const modeSecretConfig = document.getElementById('mode-secret-config');
 const arreterMaintenantBouton = document.getElementById('arreter-maintenant');
 const canvasGraphique = document.getElementById('graphique-scores');
@@ -80,7 +81,6 @@ const nbManchesTotalInput = document.getElementById('nb-manches-total');
 const nbManchesRestantesInput = document.getElementById('nb-manches-restantes');
 const listePartiesSauvegardees = document.getElementById('liste-parties-sauvegardees');
 
-// NOUVEAUX SÉLECTEURS
 const historyPlayerSelect = document.getElementById('history-player-select');
 const canvasGraphiquePosition = document.getElementById('graphique-position-details');
 const statsTopJeuxListe = document.querySelector('#stats-top-jeux ol');
@@ -89,8 +89,16 @@ const statsJoueursPodiumListe = document.querySelector('#stats-joueurs-podium ol
 const addPlayerToGraphBtn = document.getElementById('add-player-to-graph-btn');
 const graphPlayersList = document.getElementById('graph-players-list');
 
+const friendEmailInput = document.getElementById('friend-email-input');
+const friendNicknameInput = document.getElementById('friend-nickname-input');
+const friendColorInput = document.getElementById('friend-color-input');
+const btnAddFriend = document.getElementById('btn-add-friend');
+const friendsListContainer = document.getElementById('friends-list-container');
+const friendAddMsg = document.getElementById('friend-add-msg');
+const selectAmiAjout = document.getElementById('select-ami-ajout');
 
-// --- NOUVEAU CŒUR DE NAVIGATION ---
+
+// --- NAVIGATION ---
 function showPage(pageId) {
     allPages.forEach(page => page.classList.add('cache'));
     const pageToShow = document.getElementById(pageId);
@@ -105,7 +113,7 @@ function showPage(pageId) {
     }
 }
 
-// --- FONCTIONS UTILITAIRES (Inchangées) ---
+// --- FONCTIONS UTILITAIRES ---
 function pause(ms) { return new Promise(resolve => { const timer = setTimeout(() => { currentStepSkipper = null; resolve(); }, ms); currentStepSkipper = () => { clearTimeout(timer); currentStepSkipper = null; resolve(); }; }); }
 function attendreFinAnimation(element) { return new Promise(resolve => { const onAnimEnd = () => { currentStepSkipper = null; resolve(); }; element.addEventListener('animationend', onAnimEnd, { once: true }); currentStepSkipper = () => { element.removeEventListener('animationend', onAnimEnd); currentStepSkipper = null; resolve(); }; }); }
 function calculerRangs(joueursTries) { let rangActuel = 0; let scorePrecedent = null; let nbExAequo = 1; joueursTries.forEach((joueur, index) => { if (joueur.scoreTotal !== scorePrecedent) { rangActuel += nbExAequo; nbExAequo = 1; } else { nbExAequo++; } joueur.rang = rangActuel; scorePrecedent = joueur.scoreTotal; }); return joueursTries; }
@@ -131,7 +139,61 @@ function recreerGraphiqueFinal() { const graphContainer = document.querySelector
 conditionCheckboxes.forEach(checkbox => { checkbox.addEventListener('change', (e) => { const type = e.target.dataset.type; const inputId = inputIdMap[type]; const input = document.getElementById(inputId); if (input) { input.disabled = !checkbox.checked; } mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
 [scoreLimiteInput, scoreRelatifInput, nbManchesTotalInput, nbManchesRestantesInput].forEach(input => { input.addEventListener('change', () => { mettreAJourConditionsArret(); mettreAJourCompteurs(); }); });
 function mettreAJourConditionsArret() { for (const key in conditionsArret) { conditionsArret[key].active = false; } document.querySelectorAll('.condition-checkbox:checked').forEach(checkbox => { const type = checkbox.dataset.type; conditionsArret[type].active = true; const inputId = inputIdMap[type]; const inputElement = document.getElementById(inputId); const valeur = parseInt(inputElement.value, 10) || 0; if (type === 'score_limite') { conditionsArret.score_limite.valeur = valeur; } else if (type === 'score_relatif') { conditionsArret[type].valeur = valeur; joueurs.forEach(j => { j.scoreRelatifPivot = j.scoreTotal; }); } else if (type === 'manche_total') { conditionsArret.manche_total.mancheCible = valeur; } else if (type === 'manche_restante') { conditionsArret.manche_restante.mancheCible = mancheActuelle + valeur; } }); }
-ajouterBouton.addEventListener('click', () => { const nom = nomJoueurInput.value.trim(); const couleur = couleurJoueurInput.value; if (nom && !joueurs.some(j => j.nom === nom)) { joueurs.push({ nom: nom, couleur: couleur, scoreTotal: 0, scoresTour: [], scoreRelatifPivot: 0, rang: null }); nomJoueurInput.value = ''; couleurJoueurInput.value = genererCouleurAleatoire(); mettreAJourListeJoueurs(); verifierPeutDemarrer(); } else if (joueurs.some(j => j.nom === nom)) { alert(`Le joueur "${nom}" existe déjà !`); } });
+
+// MODIFIÉ : Ajouter Joueur (Prend en compte l'ami sélectionné)
+ajouterBouton.addEventListener('click', () => {
+    let nom = nomJoueurInput.value.trim();
+    let couleur = couleurJoueurInput.value;
+    let uidAmi = null;
+
+    // Vérifie si un ami est sélectionné
+    const selectedAmiIndex = selectAmiAjout.selectedIndex;
+    if (selectedAmiIndex > 0) { // Si ce n'est pas l'option par défaut
+        const option = selectAmiAjout.options[selectedAmiIndex];
+        nom = option.text; // Le nom affiché (pseudo)
+        uidAmi = option.value; // L'UID de l'ami
+        // Si l'ami a une couleur perso, on la prend
+        if (option.dataset.couleur) {
+             couleur = option.dataset.couleur;
+        }
+    }
+
+    if (nom && !joueurs.some(j => j.nom === nom)) {
+        joueurs.push({ 
+            nom: nom, 
+            couleur: couleur, 
+            scoreTotal: 0, 
+            scoresTour: [], 
+            scoreRelatifPivot: 0, 
+            rang: null,
+            uid: uidAmi 
+        });
+        
+        // Reset inputs
+        nomJoueurInput.value = '';
+        couleurJoueurInput.value = genererCouleurAleatoire();
+        selectAmiAjout.value = ""; // Reset select
+        
+        mettreAJourListeJoueurs();
+        verifierPeutDemarrer();
+    } else if (joueurs.some(j => j.nom === nom)) {
+        alert(`Le joueur "${nom}" existe déjà !`);
+    }
+});
+
+// Écouteur pour mettre à jour la couleur quand on sélectionne un ami
+selectAmiAjout.addEventListener('change', () => {
+    const selectedAmiIndex = selectAmiAjout.selectedIndex;
+    if (selectedAmiIndex > 0) {
+        const option = selectAmiAjout.options[selectedAmiIndex];
+        if (option.dataset.couleur) {
+            couleurJoueurInput.value = option.dataset.couleur;
+        }
+    } else {
+        couleurJoueurInput.value = genererCouleurAleatoire();
+    }
+});
+
 nomJoueurInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { ajouterBouton.click(); } });
 demarrerBouton.addEventListener('click', () => {
     sequenceForceStop = false; if (joueurs.length < 2) return; 
@@ -140,7 +202,10 @@ demarrerBouton.addEventListener('click', () => {
     const victoireChoix = document.querySelector('input[name="condition-victoire"]:checked').value; 
     lowScoreWins = (victoireChoix === 'low'); 
     mancheActuelle = 0;
+    
+    // Reset stats joueurs mais garde l'UID
     joueurs.forEach(j => { j.scoreTotal = 0; j.scoresTour = []; j.scoreRelatifPivot = 0; j.rang = null; }); 
+    
     if (currentUser) {
         const userRef = db.collection('utilisateurs').doc(currentUser.uid);
         const joueursRecentsRef = userRef.collection('joueursRecents');
@@ -163,8 +228,64 @@ demarrerBouton.addEventListener('click', () => {
     mettreAJourConditionsArret(); 
     showPage('page-score');
     genererChampsSaisie(); mettreAJourScoresAffichage(); mettreAJourCompteurs(); creerGraphique();
+    
+    sauvegarderPartieEnCours(true);
 });
-validerTourBouton.addEventListener('click', () => { if (validerTourBouton.disabled) return; mancheActuelle++; joueurs.forEach((joueur, index) => { const inputElement = document.getElementById(`score-${index}`); const points = parseInt(inputElement.value, 10) || 0; joueur.scoreTotal += points; joueur.scoresTour.push(points); inputElement.value = 0; }); mettreAJourScoresAffichage(); mettreAJourCompteurs(); mettreAJourGraphique(); verifierConditionsArret(); });
+
+validerTourBouton.addEventListener('click', () => { 
+    if (validerTourBouton.disabled) return; 
+    mancheActuelle++; 
+    joueurs.forEach((joueur, index) => { 
+        const inputElement = document.getElementById(`score-${index}`); 
+        const points = parseInt(inputElement.value, 10) || 0; 
+        joueur.scoreTotal += points; 
+        joueur.scoresTour.push(points); 
+        inputElement.value = 0; 
+    }); 
+    mettreAJourScoresAffichage(); 
+    mettreAJourCompteurs(); 
+    mettreAJourGraphique(); 
+    verifierConditionsArret(); 
+    
+    sauvegarderPartieEnCours();
+});
+
+annulerTourBouton.addEventListener('click', () => {
+    if (mancheActuelle > 0) {
+        if (confirm("Voulez-vous vraiment annuler le dernier tour pour le corriger ?")) {
+            mancheActuelle--;
+            
+            joueurs.forEach((joueur, index) => {
+                const dernierScore = joueur.scoresTour.pop();
+                
+                if (dernierScore !== undefined) {
+                    joueur.scoreTotal -= dernierScore;
+                    
+                    const inputElement = document.getElementById(`score-${index}`);
+                    if (inputElement) {
+                        inputElement.value = dernierScore;
+                    }
+                }
+            });
+
+            if (monGraphique) {
+                monGraphique.data.labels.pop(); 
+                monGraphique.data.datasets.forEach(dataset => {
+                    dataset.data.pop(); 
+                });
+                monGraphique.update();
+            }
+
+            mettreAJourScoresAffichage();
+            mettreAJourCompteurs();
+            sauvegarderPartieEnCours();
+        }
+    } else {
+        alert("Impossible d'annuler : aucun tour n'a été joué.");
+    }
+});
+
+
 arreterMaintenantBouton.addEventListener('click', terminerPartie);
 revealEcran.addEventListener('click', (e) => { if (e.target.closest('#skip-all-btn') || e.target.closest('#reveal-content')) { return; } if (currentStepSkipper) { currentStepSkipper(); } });
 skipAllBtn.addEventListener('click', () => {
@@ -188,15 +309,14 @@ retourAccueilBtn.addEventListener('click', () => {
     }
 });
 
-// --- INITIALISATION (simple) ---
+// --- INITIALISATION ---
 couleurJoueurInput.value = genererCouleurAleatoire();
 
 /* =================================================================
---- SECTION AUTHENTIFICATION ET SAUVEGARDE (Code Modifié) ---
+--- SECTION AUTHENTIFICATION ET SAUVEGARDE ---
 =================================================================
 */
 
-// --- 1. Références Firebase (Auth) et Variables d'état ---
 const auth = firebase.auth(); 
 const authErreur = document.getElementById('auth-erreur');
 const signupBtn = document.getElementById('auth-signup');
@@ -206,13 +326,30 @@ const saveFeedback = document.getElementById('save-feedback');
 let partieIdActuelle = null; 
 let currentUser = null;
 
-// --- 2. Fonctions d'Authentification ---
 function afficherAuthErreur(message) { authErreur.textContent = message; authErreur.classList.remove('cache'); }
-signupBtn.addEventListener('click', () => { const email = document.getElementById('auth-email').value; const password = document.getElementById('auth-password').value; auth.createUserWithEmailAndPassword(email, password) .catch(err => { afficherAuthErreur(err.message); }); });
+
+signupBtn.addEventListener('click', () => { 
+    const email = document.getElementById('auth-email').value; 
+    const password = document.getElementById('auth-password').value; 
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            creerProfilPublic(userCredential.user);
+        })
+        .catch(err => { afficherAuthErreur(err.message); }); 
+});
+
+function creerProfilPublic(user) {
+    db.collection('users_public').doc(user.uid).set({
+        email: user.email,
+        uid: user.uid
+    }).then(() => {
+        console.log("Profil public créé");
+    }).catch(err => console.error("Erreur profil public", err));
+}
+
 loginBtn.addEventListener('click', () => { const email = document.getElementById('auth-email').value; const password = document.getElementById('auth-password').value; auth.signInWithEmailAndPassword(email, password) .catch(err => { afficherAuthErreur(err.message); }); });
 logoutBtn.addEventListener('click', () => { auth.signOut(); });
 
-// --- 3. Gestionnaire d'état de connexion (Le Cerveau) ---
 auth.onAuthStateChanged(user => {
     if (user) {
         currentUser = user;
@@ -220,13 +357,15 @@ auth.onAuthStateChanged(user => {
         authEcran.classList.add('cache');
         appLayout.classList.remove('cache'); 
         
+        creerProfilPublic(user);
+
         chargerListeParties();
         chargerHistoriqueParties();
         chargerCategoriesConnues();
         chargerJoueursRecents();
+        chargerAmis(); 
         
-        // *** MODIFIÉ : Page d'accueil par défaut ***
-        showPage('page-history-grid'); 
+        showPage('page-new-game'); 
     } else {
         currentUser = null;
         authEcran.classList.remove('cache');
@@ -234,14 +373,315 @@ auth.onAuthStateChanged(user => {
     }
 });
 
-// --- 4. Fonctions de Sauvegarde et Chargement ---
-sauvegarderBtn.addEventListener('click', async () => { if (!currentUser || validerTourBouton.disabled) return; const etatPartie = { joueurs: joueurs, mancheActuelle: mancheActuelle, scoresSecrets: scoresSecrets, lowScoreWins: lowScoreWins, conditionsArret: conditionsArret, dernierSauvegarde: new Date().toISOString() }; const userRef = db.collection('utilisateurs').doc(currentUser.uid); const partiesRef = userRef.collection('parties'); sauvegarderBtn.disabled = true; saveFeedback.textContent = "Sauvegarde en cours..."; saveFeedback.classList.remove('cache'); try { if (partieIdActuelle) { await partiesRef.doc(partieIdActuelle).set(etatPartie, { merge: true }); } else { const docRef = await partiesRef.add(etatPartie); partieIdActuelle = docRef.id; } saveFeedback.textContent = "Partie sauvegardée !"; setTimeout(() => saveFeedback.classList.add('cache'), 2000); chargerListeParties(); } catch (err) { console.error("Erreur de sauvegarde: ", err); saveFeedback.textContent = "Erreur de sauvegarde."; } finally { sauvegarderBtn.disabled = false; } });
+// --- GESTION DES AMIS (MODIFIÉ POUR ÉDITION ET UPDATE HISTORIQUE) ---
+
+btnAddFriend.addEventListener('click', () => {
+    const email = friendEmailInput.value.trim();
+    const nickname = document.getElementById('friend-nickname-input').value.trim();
+    const color = document.getElementById('friend-color-input').value;
+
+    if (email) ajouterAmi(email, nickname, color);
+});
+
+function ajouterAmi(email, nickname, color) {
+    friendAddMsg.classList.remove('cache');
+    friendAddMsg.textContent = "Recherche...";
+    friendAddMsg.style.color = "blue";
+
+    db.collection('users_public').where('email', '==', email).get()
+    .then(snapshot => {
+        if (snapshot.empty) {
+            friendAddMsg.textContent = "Aucun utilisateur trouvé avec cet email.";
+            friendAddMsg.style.color = "red";
+            return;
+        }
+        
+        const amiDoc = snapshot.docs[0].data();
+        const amiUid = amiDoc.uid;
+        const amiEmail = amiDoc.email;
+
+        // Valeurs par défaut si non fournies
+        const finalNickname = nickname || amiEmail.split('@')[0];
+        const finalColor = color || genererCouleurAleatoire();
+
+        db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(amiUid).set({
+            email: amiEmail,
+            uid: amiUid,
+            surnom: finalNickname,
+            couleur: finalColor,
+            dateAjout: new Date().toISOString()
+        }).then(() => {
+            friendAddMsg.textContent = "Ami ajouté !";
+            friendAddMsg.style.color = "green";
+            friendEmailInput.value = "";
+            document.getElementById('friend-nickname-input').value = ""; // Reset
+            chargerAmis();
+        });
+    })
+    .catch(err => {
+        console.error("Erreur ajout ami", err);
+        friendAddMsg.textContent = "Erreur lors de l'ajout.";
+        friendAddMsg.style.color = "red";
+    });
+}
+
+// *** MODIFIÉE : MET A JOUR L'HISTORIQUE ***
+async function sauvegarderAmi(uid, nouveauSurnom, nouvelleCouleur, ancienNom) {
+    if (!currentUser) return;
+    
+    // 1. Mise à jour de la liste d'amis
+    await db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).update({
+        surnom: nouveauSurnom,
+        couleur: nouvelleCouleur
+    });
+    
+    console.log("Ami mis à jour. Début mise à jour historique...");
+
+    // 2. Mise à jour RÉTROACTIVE de l'historique
+    const historyRef = db.collection('utilisateurs').doc(currentUser.uid).collection('historique');
+    const snapshot = await historyRef.get();
+
+    snapshot.forEach(doc => {
+        let data = doc.data();
+        let modified = false;
+
+        // Mise à jour dans joueursComplets
+        if (data.joueursComplets) {
+            data.joueursComplets = data.joueursComplets.map(j => {
+                // On vérifie par UID (si présent) ou par l'ancien nom (si pas d'UID)
+                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) {
+                    j.nom = nouveauSurnom;
+                    j.couleur = nouvelleCouleur;
+                    // On ajoute l'UID s'il manquait
+                    if (!j.uid) j.uid = uid; 
+                    modified = true;
+                }
+                return j;
+            });
+        }
+
+        // Mise à jour dans le classement (pour l'affichage)
+        if (data.classement) {
+            data.classement = data.classement.map(j => {
+                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) {
+                    j.nom = nouveauSurnom;
+                    j.couleur = nouvelleCouleur;
+                    if (!j.uid) j.uid = uid;
+                    modified = true;
+                }
+                return j;
+            });
+        }
+
+        if (modified) {
+            historyRef.doc(doc.id).update({
+                joueursComplets: data.joueursComplets,
+                classement: data.classement
+            }).then(() => console.log(`Partie ${doc.id} mise à jour.`));
+        }
+    });
+
+    chargerAmis(); 
+    chargerHistoriqueParties(); // Rafraichir l'historique
+}
+
+function supprimerAmi(uid) {
+    if (!currentUser) return;
+    if(confirm("Voulez-vous vraiment supprimer cet ami ?")) {
+        db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).delete()
+        .then(() => {
+            console.log("Ami supprimé");
+            chargerAmis();
+        })
+        .catch(err => console.error("Erreur suppression ami", err));
+    }
+}
+
+function chargerAmis() {
+    if (!currentUser) return;
+    db.collection('utilisateurs').doc(currentUser.uid).collection('amis').get()
+    .then(snapshot => {
+        mesAmis = [];
+        friendsListContainer.innerHTML = "";
+        selectAmiAjout.innerHTML = '<option value="">-- Choisir un ami --</option>';
+
+        if (snapshot.empty) {
+            friendsListContainer.innerHTML = "<p>Vous n'avez pas encore d'amis.</p>";
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const ami = doc.data();
+            mesAmis.push(ami);
+
+            const pseudo = ami.surnom || ami.email.split('@')[0];
+            const couleur = ami.couleur || "#CCCCCC";
+
+            const div = document.createElement('div');
+            div.className = 'friend-item';
+            div.dataset.uid = ami.uid; 
+
+            const viewDiv = document.createElement('div');
+            viewDiv.className = 'friend-view';
+            viewDiv.innerHTML = `
+                <div class="friend-info">
+                    <span class="friend-color-swatch" style="background-color: ${couleur};"></span>
+                    <span>${pseudo}</span> 
+                    <span class="friend-email">(${ami.email})</span>
+                </div>
+                <div class="friend-actions">
+                    <button class="btn-icon btn-edit-friend"><i class="fa-solid fa-pencil"></i></button>
+                    <button class="btn-icon btn-delete-friend"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `;
+
+            const editDiv = document.createElement('div');
+            editDiv.className = 'friend-edit-form';
+            editDiv.innerHTML = `
+                <input type="text" class="edit-surnom" value="${pseudo}" placeholder="Surnom">
+                <input type="color" class="edit-couleur" value="${couleur}">
+                <button class="btn-save-friend"><i class="fa-solid fa-check"></i></button>
+                <button class="btn-cancel-friend"><i class="fa-solid fa-times"></i></button>
+            `;
+
+            div.appendChild(viewDiv);
+            div.appendChild(editDiv);
+            friendsListContainer.appendChild(div);
+
+            const btnEdit = viewDiv.querySelector('.btn-edit-friend');
+            const btnDelete = viewDiv.querySelector('.btn-delete-friend');
+            const btnSave = editDiv.querySelector('.btn-save-friend');
+            const btnCancel = editDiv.querySelector('.btn-cancel-friend');
+
+            btnEdit.addEventListener('click', () => {
+                viewDiv.style.display = 'none';
+                editDiv.style.display = 'flex';
+                editDiv.classList.add('active');
+            });
+            
+            btnDelete.addEventListener('click', () => {
+                supprimerAmi(ami.uid);
+            });
+
+            btnCancel.addEventListener('click', () => {
+                editDiv.style.display = 'none';
+                editDiv.classList.remove('active');
+                viewDiv.style.display = 'flex';
+                editDiv.querySelector('.edit-surnom').value = pseudo;
+                editDiv.querySelector('.edit-couleur').value = couleur;
+            });
+
+            btnSave.addEventListener('click', () => {
+                const newName = editDiv.querySelector('.edit-surnom').value;
+                const newColor = editDiv.querySelector('.edit-couleur').value;
+                // On passe 'pseudo' comme ancien nom pour la recherche historique
+                sauvegarderAmi(ami.uid, newName, newColor, pseudo);
+            });
+
+            const option = document.createElement('option');
+            option.value = ami.uid; 
+            option.text = pseudo; 
+            option.dataset.couleur = couleur;  
+            selectAmiAjout.appendChild(option);
+        });
+    });
+}
+
+
+// --- SAUVEGARDE ET HISTORIQUE ---
+
+sauvegarderBtn.addEventListener('click', () => {
+    sauvegarderPartieEnCours();
+});
+
+async function sauvegarderPartieEnCours(isNew = false) {
+    if (!currentUser) return;
+    
+    if (validerTourBouton.disabled && !isNew) return;
+
+    const etatPartie = { 
+        joueurs: joueurs, 
+        mancheActuelle: mancheActuelle, 
+        scoresSecrets: scoresSecrets, 
+        lowScoreWins: lowScoreWins, 
+        conditionsArret: conditionsArret, 
+        dernierSauvegarde: new Date().toISOString() 
+    }; 
+    
+    const userRef = db.collection('utilisateurs').doc(currentUser.uid); 
+    const partiesRef = userRef.collection('parties'); 
+    
+    sauvegarderBtn.disabled = true; 
+    saveFeedback.textContent = "Sauvegarde auto..."; 
+    saveFeedback.classList.remove('cache'); 
+    
+    try { 
+        if (partieIdActuelle) { 
+            await partiesRef.doc(partieIdActuelle).set(etatPartie, { merge: true }); 
+        } else { 
+            const docRef = await partiesRef.add(etatPartie); 
+            partieIdActuelle = docRef.id; 
+        } 
+        saveFeedback.textContent = "Partie sauvegardée !"; 
+        setTimeout(() => saveFeedback.textContent = "", 2000); 
+        chargerListeParties(); 
+    } catch (err) { 
+        console.error("Erreur de sauvegarde: ", err); 
+        saveFeedback.textContent = "Erreur de sauvegarde."; 
+    } finally { 
+        sauvegarderBtn.disabled = false; 
+    }
+}
+
 function chargerListeParties() { if (!currentUser) return; const userRef = db.collection('utilisateurs').doc(currentUser.uid); listePartiesSauvegardees.innerHTML = "Chargement..."; userRef.collection('parties').orderBy('dernierSauvegarde', 'desc').get() .then(querySnapshot => { if (querySnapshot.empty) { listePartiesSauvegardees.innerHTML = "<p>Aucune partie en cours.</p>"; return; } listePartiesSauvegardees.innerHTML = ""; querySnapshot.forEach(doc => { const partie = doc.data(); const nomsJoueurs = partie.joueurs.map(j => j.nom).join(', '); const div = document.createElement('div'); div.innerHTML = ` <div class="partie-historique"> <div class="header-info"> <span><strong>Manche ${partie.mancheActuelle}</strong> (${nomsJoueurs})</span> <div class="action-buttons"> <button class="charger-btn" data-id="${doc.id}" style="background-color: #28a745;">Charger</button> <button class="supprimer-btn" data-id="${doc.id}" style="background-color: #dc3545;">&times;</button> </div> </div> </div> `; listePartiesSauvegardees.appendChild(div); }); }) .catch(err => { console.error("Erreur chargement parties: ", err); listePartiesSauvegardees.innerHTML = "<p>Erreur lors du chargement.</p>"; }); }
 listePartiesSauvegardees.addEventListener('click', e => { const target = e.target; const id = target.dataset.id; if (!id || !currentUser) return; const partieRef = db.collection('utilisateurs').doc(currentUser.uid).collection('parties').doc(id); if (target.classList.contains('charger-btn')) { partieRef.get().then(doc => { if (doc.exists) { const etatPartie = doc.data(); partieIdActuelle = doc.id; joueurs = etatPartie.joueurs; mancheActuelle = etatPartie.mancheActuelle; scoresSecrets = etatPartie.scoresSecrets; lowScoreWins = etatPartie.lowScoreWins; conditionsArret = etatPartie.conditionsArret; showPage('page-score'); validerTourBouton.disabled = false; arreterMaintenantBouton.disabled = false; document.querySelectorAll('.condition-checkbox').forEach(cb => { const type = cb.dataset.type; if (conditionsArret[type]) { cb.checked = conditionsArret[type].active; const input = document.getElementById(inputIdMap[type]); if(input) { input.disabled = !cb.checked; if (type.includes('manche')) { if (type === 'manche_total') input.value = conditionsArret[type].mancheCible; } else { input.value = conditionsArret[type].valeur; } } } }); genererChampsSaisie(); mettreAJourScoresAffichage(); creerGraphique(); if (!scoresSecrets) { let scoreCumules = new Array(joueurs.length).fill(0); if (monGraphique.data.datasets.length !== joueurs.length) { creerGraphique(); } for (let i = 0; i < mancheActuelle; i++) { if(monGraphique.data.labels.length <= i + 1) { monGraphique.data.labels.push(`Manche ${i + 1}`); } joueurs.forEach((joueur, index) => { const scoreDeCeTour = (joueur.scoresTour && joueur.scoresTour[i]) ? joueur.scoresTour[i] : 0; scoreCumules[index] += scoreDeCeTour; if(monGraphique.data.datasets[index]) { monGraphique.data.datasets[index].data[i+1] = scoreCumules[index]; } }); } monGraphique.update(); } mettreAJourCompteurs(); } }); } else if (target.classList.contains('supprimer-btn')) { if (confirm("Voulez-vous vraiment supprimer cette sauvegarde ?")) { partieRef.delete().then(() => { chargerListeParties(); }); } } });
 
-// --- 5. Fonctions pour l'HISTORIQUE (Modifiées) ---
-async function sauvegarderHistoriquePartie(classement) { if (!currentUser) return; const userRef = db.collection('utilisateurs').doc(currentUser.uid); const historiqueRef = userRef.collection('historique'); const entreeHistorique = { date: new Date().toISOString(), nomJeu: nomJeuActuel, classement: classement, joueursComplets: joueurs, manches: mancheActuelle, lowScoreWins: lowScoreWins }; try { await historiqueRef.add(entreeHistorique); console.log("Historique de partie sauvegardé !"); if (!categoriesJeuxConnues.includes(nomJeuActuel)) { categoriesJeuxConnues.push(nomJeuActuel); mettreAJourDatalistJeux(); } chargerHistoriqueParties(); if (partieIdActuelle) { const partieEnCoursRef = userRef.collection('parties').doc(partieIdActuelle); await partieEnCoursRef.delete(); partieIdActuelle = null; console.log("Partie 'en cours' supprimée et transférée à l'historique."); chargerListeParties(); } } catch (err) { console.error("Erreur sauvegarde historique: ", err); } }
+async function sauvegarderHistoriquePartie(classement) { 
+    if (!currentUser) return; 
+    
+    const entreeHistorique = { 
+        date: new Date().toISOString(), 
+        nomJeu: nomJeuActuel, 
+        classement: classement, 
+        joueursComplets: joueurs, 
+        manches: mancheActuelle, 
+        lowScoreWins: lowScoreWins 
+    }; 
 
+    try { 
+        const userRef = db.collection('utilisateurs').doc(currentUser.uid); 
+        await userRef.collection('historique').add(entreeHistorique); 
+        console.log("Historique sauvegardé pour le créateur !"); 
+
+        for (const joueur of joueurs) {
+            if (joueur.uid && joueur.uid !== currentUser.uid) {
+                try {
+                    await db.collection('utilisateurs').doc(joueur.uid).collection('historique').add(entreeHistorique);
+                    console.log(`Historique partagé sauvegardé pour ${joueur.nom} (${joueur.uid})`);
+                } catch (friendErr) {
+                    console.error(`Impossible de sauvegarder pour l'ami ${joueur.nom}:`, friendErr);
+                }
+            }
+        }
+
+        if (!categoriesJeuxConnues.includes(nomJeuActuel)) { 
+            categoriesJeuxConnues.push(nomJeuActuel); 
+            mettreAJourDatalistJeux(); 
+        } 
+        chargerHistoriqueParties(); 
+        if (partieIdActuelle) { 
+            const partieEnCoursRef = userRef.collection('parties').doc(partieIdActuelle); 
+            await partieEnCoursRef.delete(); 
+            partieIdActuelle = null; 
+            console.log("Partie 'en cours' supprimée et transférée à l'historique."); 
+            chargerListeParties(); 
+        } 
+    } catch (err) { 
+        console.error("Erreur sauvegarde historique: ", err); 
+    } 
+}
+
+// ... (Le reste du code JS : chargerHistoriqueParties, stats, graphiques, etc. reste inchangé) ...
 async function chargerHistoriqueParties() {
     if (!currentUser) return;
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
