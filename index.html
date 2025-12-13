@@ -15,13 +15,40 @@
 </head>
 <body>
 
-    <div id="auth-ecran" class="input-group">
-        <h3>🦊 Fox Score - Connexion</h3>
-        <input type="email" id="auth-email" placeholder="Email">
-        <input type="password" id="auth-password" placeholder="Mot de passe">
-        <button id="auth-signup">Créer un compte</button>
-        <button id="auth-login">Se Connecter</button>
-        <p id="auth-erreur" class="erreur-msg cache"></p>
+    <div id="auth-ecran">
+        <div class="auth-container">
+            <h1 class="auth-title">🦊 Fox Score</h1>
+            
+            <div id="auth-choice" class="auth-view">
+                <button id="btn-show-login" class="btn-auth">Se Connecter</button>
+                <button id="btn-show-signup" class="btn-auth btn-outline">Créer un compte</button>
+            </div>
+
+            <div id="form-login" class="auth-view cache">
+                <h3>Bon retour !</h3>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Mot de passe">
+                <button id="perform-login" class="btn-auth">Valider</button>
+                <button class="btn-text-back" id="back-to-choice-1">Retour</button>
+            </div>
+
+            <div id="form-signup" class="auth-view cache">
+                <h3>Nouveau Profil</h3>
+                <div class="signup-row">
+                    <input type="text" id="signup-pseudo" placeholder="Votre Pseudo (ex: FoxKing)">
+                </div>
+                <div class="signup-row color-row">
+                    <label>Votre couleur :</label>
+                    <input type="color" id="signup-color" value="#e67e22">
+                </div>
+                <input type="email" id="signup-email" placeholder="Email">
+                <input type="password" id="signup-password" placeholder="Mot de passe">
+                <button id="perform-signup" class="btn-auth">Créer mon compte</button>
+                <button class="btn-text-back" id="back-to-choice-2">Retour</button>
+            </div>
+
+            <p id="auth-erreur" class="erreur-msg cache"></p>
+        </div>
     </div>
 
     <div id="app-layout" class="cache">
@@ -33,15 +60,16 @@
         <nav id="side-nav">
             <div id="nav-logo">
                 <img src="FoxScore.png" alt="FoxScore" style="width: 100%; height: auto; max-width: 150px;">
+                <p id="nav-user-pseudo" style="margin-top:10px; font-weight:bold; color:#333;"></p>
             </div>
             <div id="nav-links">
                 <a href="#" class="nav-link active" data-page="page-new-game">Nouvelle Partie</a>
                 <a href="#" class="nav-link" data-page="page-ongoing-games">Parties en Cours</a>
                 <a href="#" class="nav-link" data-page="page-history-grid">Historique</a>
                 <a href="#" class="nav-link" data-page="page-friends">Mes Amis</a>
+                <a href="#" class="nav-link" data-page="page-profile">Mon Profil</a>
             </div>
             <div id="user-info-nav">
-                <p>Connecté : <strong id="user-email-nav"></strong></p>
                 <button id="auth-logout">Se Déconnecter</button>
             </div>
         </nav>
@@ -60,7 +88,7 @@
                         <input type="text" id="nom-joueur" placeholder="Nom du joueur">
                         <span style="font-size: 0.9em; color: #777;">ou</span>
                         <select id="select-ami-ajout">
-                            <option value="">-- Choisir un ami --</option>
+                            <option value="">-- Choisir un profil --</option>
                         </select>
                     </div>
                     <div class="player-color-row">
@@ -105,7 +133,6 @@
                 <div class="input-group">
                     <h3>Ajouter un ami</h3>
                     <p style="width:100%; font-size: 0.9em; color: #666; margin-bottom: 10px;">Recherchez par email, puis choisissez un surnom et une couleur.</p>
-                    
                     <div class="add-friend-form">
                         <input type="email" id="friend-email-input" placeholder="Email de l'ami (ex: ami@test.com)">
                         <div class="friend-details-inputs">
@@ -116,12 +143,36 @@
                     </div>
                     <p id="friend-add-msg" class="cache"></p>
                 </div>
-
                 <div class="input-group">
                     <h3>Liste d'amis</h3>
                     <div id="friends-list-container" style="width: 100%;">
                         <p>Chargement...</p>
                     </div>
+                </div>
+            </div>
+
+            <div id="page-profile" class="page-content cache">
+                <h2>👤 Mon Profil</h2>
+                <div class="input-group" style="flex-direction: column; align-items: flex-start;">
+                    <h3>Mes Informations</h3>
+                    <div class="signup-row" style="width: 100%;">
+                        <label>Pseudo Public :</label>
+                        <input type="text" id="profile-pseudo">
+                    </div>
+                    <div class="signup-row color-row" style="width: 100%;">
+                        <label>Ma Couleur :</label>
+                        <input type="color" id="profile-color">
+                    </div>
+                    <button id="btn-update-profile" style="background-color: #28a745;">Enregistrer les modifications</button>
+                </div>
+                <div class="input-group" style="flex-direction: column; align-items: flex-start;">
+                    <h3>Sécurité</h3>
+                    <div class="signup-row" style="width: 100%;">
+                        <label>Nouveau mot de passe :</label>
+                        <input type="password" id="profile-new-password" placeholder="Laisser vide si inchangé">
+                    </div>
+                    <button id="btn-update-password" style="background-color: #17a2b8;">Changer le mot de passe</button>
+                    <p id="profile-msg" class="cache" style="margin-top:10px; font-weight:bold;"></p>
                 </div>
             </div>
 
@@ -153,7 +204,6 @@
             <div id="page-history-details" class="page-content cache">
                 <button id="history-back-btn" class="bouton-simple">&larr; Retour à l'historique</button>
                 <h2 id="history-details-title">Historique pour...</h2>
-                
                 <div id="history-details-chart-controls" class="input-group">
                     <h3>Analyse de position</h3>
                     <div id="graph-players-list"></div>
@@ -165,7 +215,6 @@
                         <canvas id="graphique-position-details"></canvas>
                     </div>
                 </div>
-
                 <h3>Toutes les parties</h3>
                 <div id="liste-historique-parties-details"></div>
             </div>
@@ -199,12 +248,10 @@
                             <label><input type="checkbox" class="condition-checkbox" id="check-manche-total" data-type="manche_total"> Arrêter après un total de <input type="number" id="nb-manches-total" min="1" value="10" disabled> manches.</label><br>
                             <label><input type="checkbox" class="condition-checkbox" id="check-manche-restante" data-type="manche_restante"> Arrêter dans <input type="number" id="nb-manches-restantes" min="1" value="3" disabled> manches restantes.</label>
                         </div>
-                        
                         <div style="margin-top: 15px;">
                             <button id="sauvegarder-partie" style="background-color: #28a745; width: 100%;">Sauvegarder Manuellement</button>
                             <p id="save-feedback" style="color: green; text-align: center; height: 20px; font-size: 0.9em; margin: 0;"></p>
                         </div>
-
                         <button id="arreter-maintenant" class="bouton-fin">Terminer la partie Maintenant</button>
                     </div>
                 </div>
