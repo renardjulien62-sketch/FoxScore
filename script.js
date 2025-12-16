@@ -262,6 +262,7 @@ btnUpdateProfile.addEventListener('click', () => {
     const newPseudo = profilePseudoInput.value.trim();
     const newColor = profileColorInput.value;
     if(!newPseudo) { alert("Le pseudo ne peut pas être vide"); return; }
+    
     const userRef = db.collection('utilisateurs').doc(currentUser.uid);
     const publicRef = db.collection('users_public').doc(currentUser.uid);
 
@@ -300,7 +301,7 @@ btnUpdatePassword.addEventListener('click', () => {
 });
 
 // =============================================================
-// 6. GESTION DES AMIS (Partie manquante corrigée)
+// 6. GESTION DES AMIS
 // =============================================================
 
 // Écouteur du bouton Ajouter Ami
@@ -318,7 +319,6 @@ btnAddFriend.addEventListener('click', () => {
     }
 });
 
-// Fonction Ajouter Ami avec Gestion d'erreur
 function ajouterAmi(email, nickname, color) {
     friendAddMsg.classList.remove('cache');
     friendAddMsg.textContent = "Recherche en cours...";
@@ -336,7 +336,6 @@ function ajouterAmi(email, nickname, color) {
         const amiUid = amiDoc.uid;
         const amiEmail = amiDoc.email;
 
-        // Valeurs par défaut
         const finalNickname = nickname || amiDoc.pseudo || amiEmail.split('@')[0];
         const finalColor = color || amiDoc.couleur || genererCouleurAleatoire();
 
@@ -444,7 +443,7 @@ function chargerAmis() {
 }
 
 // =============================================================
-// 7. LOGIQUE JEU - CONFIGURATION
+// 7. LOGIQUE JEU
 // =============================================================
 
 function genererCouleurAleatoire() { return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'); }
@@ -529,7 +528,7 @@ demarrerBouton.addEventListener('click', () => {
     if (currentUser) {
         const userRef = db.collection('utilisateurs').doc(currentUser.uid);
         joueurs.forEach(j => {
-            if(j.uid !== currentUser.uid) { // Save others only
+            if(j.uid !== currentUser.uid) { 
                 userRef.collection('joueursRecents').doc(j.nom).set({ nom: j.nom, couleur: j.couleur });
             }
         });
@@ -553,7 +552,7 @@ demarrerBouton.addEventListener('click', () => {
 });
 
 // =============================================================
-// 8. IN-GAME LOGIC
+// 8. IN-GAME
 // =============================================================
 async function sauvegarderPartieEnCours(isNew = false) {
     if (!currentUser) return;
@@ -769,6 +768,52 @@ async function sauvegarderHistoriquePartie(classement) {
         if (!categoriesJeuxConnues.includes(nomJeuActuel)) { categoriesJeuxConnues.push(nomJeuActuel); mettreAJourDatalistJeux(); } 
         chargerHistoriqueParties(); 
     } catch (err) { console.error("Erreur historique: ", err); } 
+}
+
+// CORRECTION HISTORIQUE (SUPPRESSION DE ORDERBY POUR ÉVITER LES ERREURS D'INDEX)
+async function chargerHistoriqueParties() { 
+    if (!currentUser) return; 
+    const userRef = db.collection('utilisateurs').doc(currentUser.uid); 
+    historyGridJeux.innerHTML = "Chargement..."; 
+    try { 
+        // Note: On récupère tout et on trie en JS pour éviter les erreurs d'index Firestore
+        const querySnapshot = await userRef.collection('historique').get(); 
+        allHistoryData = []; 
+        querySnapshot.forEach(doc => { 
+            let data = doc.data(); 
+            data.id = doc.id; 
+            allHistoryData.push(data); 
+        }); 
+        
+        // Tri JS
+        allHistoryData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        if (allHistoryData.length === 0) { 
+            historyGridJeux.innerHTML = "<p>Aucun historique.</p>"; 
+            return; 
+        } 
+        
+        const partiesParJeu = {}; 
+        allHistoryData.forEach(partie => { 
+            const nomJeu = partie.nomJeu || "Parties"; 
+            partiesParJeu[nomJeu] = (partiesParJeu[nomJeu] || 0) + 1; 
+        }); 
+        
+        historyGridJeux.innerHTML = ""; 
+        Object.keys(partiesParJeu).sort().forEach(nomJeu => { 
+            const nb = partiesParJeu[nomJeu]; 
+            const div = document.createElement('div'); 
+            div.className = 'history-game-square'; 
+            div.dataset.nomJeu = nomJeu; 
+            div.innerHTML = `${nomJeu}<span>${nb} partie${nb>1?'s':''}</span>`; 
+            historyGridJeux.appendChild(div); 
+        }); 
+        
+        afficherStatsGlobales(); 
+    } catch (err) { 
+        console.error(err); 
+        historyGridJeux.innerHTML = "<p>Erreur lors du chargement.</p>"; 
+    } 
 }
 
 function afficherStatsGlobales() {
