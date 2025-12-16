@@ -301,34 +301,49 @@ btnUpdatePassword.addEventListener('click', () => {
 });
 
 // =============================================================
-// 6. GESTION DES AMIS
+// 6. GESTION DES AMIS (CORRIGÉE & SÉCURISÉE)
 // =============================================================
 
-// Écouteur du bouton Ajouter Ami
-btnAddFriend.addEventListener('click', () => {
-    const email = friendEmailInput.value.trim();
-    const nickname = friendNicknameInput.value.trim();
-    const color = friendColorInput.value;
+// 1. Écouteur du bouton "Ajouter"
+if (btnAddFriend) {
+    btnAddFriend.addEventListener('click', () => {
+        // Sécurité : Vérifier si les champs existent
+        if (!friendEmailInput || !friendNicknameInput || !friendColorInput) {
+            console.error("Erreur : Champs d'ajout d'ami introuvables dans le HTML.");
+            return;
+        }
 
-    if (email) {
-        ajouterAmi(email, nickname, color);
-    } else {
-        friendAddMsg.textContent = "Veuillez entrer un email.";
-        friendAddMsg.style.color = "red";
-        friendAddMsg.classList.remove('cache');
-    }
-});
+        const email = friendEmailInput.value.trim();
+        const nickname = friendNicknameInput.value.trim();
+        const color = friendColorInput.value;
 
+        if (email) {
+            ajouterAmi(email, nickname, color);
+        } else {
+            if (friendAddMsg) {
+                friendAddMsg.textContent = "Veuillez entrer une adresse email.";
+                friendAddMsg.style.color = "red";
+                friendAddMsg.classList.remove('cache');
+            }
+        }
+    });
+}
+
+// 2. Fonction Ajouter Ami
 function ajouterAmi(email, nickname, color) {
-    friendAddMsg.classList.remove('cache');
-    friendAddMsg.textContent = "Recherche en cours...";
-    friendAddMsg.style.color = "blue";
+    if (friendAddMsg) {
+        friendAddMsg.classList.remove('cache');
+        friendAddMsg.textContent = "Recherche en cours...";
+        friendAddMsg.style.color = "blue";
+    }
 
     db.collection('users_public').where('email', '==', email).get()
     .then(snapshot => {
         if (snapshot.empty) {
-            friendAddMsg.textContent = "Aucun compte trouvé avec cet email.";
-            friendAddMsg.style.color = "red";
+            if (friendAddMsg) {
+                friendAddMsg.textContent = "Introuvable. Cet ami s'est-il déjà connecté ?";
+                friendAddMsg.style.color = "red";
+            }
             return;
         }
         
@@ -336,9 +351,12 @@ function ajouterAmi(email, nickname, color) {
         const amiUid = amiDoc.uid;
         const amiEmail = amiDoc.email;
 
+        // Si couleur/surnom vide, on prend ceux du profil public ou une couleur aléatoire
+        // Note: genererCouleurAleatoire doit être défini plus bas dans le code (Section 7), c'est normal.
         const finalNickname = nickname || amiDoc.pseudo || amiEmail.split('@')[0];
-        const finalColor = color || amiDoc.couleur || genererCouleurAleatoire();
+        const finalColor = color || amiDoc.couleur || (typeof genererCouleurAleatoire === 'function' ? genererCouleurAleatoire() : '#cccccc');
 
+        // Ajout dans la base de données
         db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(amiUid).set({
             email: amiEmail,
             uid: amiUid,
@@ -346,65 +364,100 @@ function ajouterAmi(email, nickname, color) {
             couleur: finalColor,
             dateAjout: new Date().toISOString()
         }).then(() => {
-            friendAddMsg.textContent = "Ami ajouté !";
-            friendAddMsg.style.color = "green";
+            if (friendAddMsg) {
+                friendAddMsg.textContent = "Ami ajouté avec succès !";
+                friendAddMsg.style.color = "green";
+            }
+            
+            // Vider les champs
             friendEmailInput.value = "";
             friendNicknameInput.value = "";
+            
+            // Rafraîchir la liste
             chargerAmis();
             
-            setTimeout(() => { friendAddMsg.classList.add('cache'); }, 3000);
+            setTimeout(() => { if(friendAddMsg) friendAddMsg.classList.add('cache'); }, 3000);
         });
     })
     .catch(err => {
-        console.error("Erreur ajout ami", err);
-        friendAddMsg.textContent = "Erreur lors de l'ajout.";
-        friendAddMsg.style.color = "red";
+        console.error("Erreur ajout ami :", err);
+        if (friendAddMsg) {
+            friendAddMsg.textContent = "Erreur technique.";
+            friendAddMsg.style.color = "red";
+        }
     });
 }
 
+// 3. Fonction Supprimer Ami
 function supprimerAmi(uid) { 
     if (!currentUser) return; 
-    if(confirm("Supprimer cet ami ?")) { 
-        db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).delete().then(() => chargerAmis()); 
+    if(confirm("Voulez-vous vraiment supprimer cet ami ?")) { 
+        db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).delete()
+        .then(() => chargerAmis())
+        .catch(err => console.error(err));
     } 
 }
 
-// CETTE FONCTION APPELE chargerHistoriqueParties, IL FAUT QU'ELLE SOIT DÉFINIE AVANT OU APRÈS, MAIS PRÉSENTE
+// 4. Fonction Sauvegarder Ami (Modification) + Update Historique
 async function sauvegarderAmi(uid, nouveauSurnom, nouvelleCouleur, ancienNom) { 
     if (!currentUser) return; 
-    await db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).update({ surnom: nouveauSurnom, couleur: nouvelleCouleur }); 
+    
+    // Mise à jour de la fiche ami
+    await db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(uid).update({ 
+        surnom: nouveauSurnom, 
+        couleur: nouvelleCouleur 
+    }); 
+    
+    // Mise à jour rétroactive de l'historique
     const historyRef = db.collection('utilisateurs').doc(currentUser.uid).collection('historique'); 
     const snapshot = await historyRef.get(); 
+    
     snapshot.forEach(doc => { 
         let data = doc.data(); 
         let modified = false; 
+        
         if (data.joueursComplets) { 
             data.joueursComplets = data.joueursComplets.map(j => { 
-                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) { j.nom = nouveauSurnom; j.couleur = nouvelleCouleur; if (!j.uid) j.uid = uid; modified = true; } 
+                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) { 
+                    j.nom = nouveauSurnom; j.couleur = nouvelleCouleur; if (!j.uid) j.uid = uid; modified = true; 
+                } 
                 return j; 
             }); 
         } 
         if (data.classement) { 
             data.classement = data.classement.map(j => { 
-                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) { j.nom = nouveauSurnom; j.couleur = nouvelleCouleur; if (!j.uid) j.uid = uid; modified = true; } 
+                if (j.uid === uid || (!j.uid && j.nom === ancienNom)) { 
+                    j.nom = nouveauSurnom; j.couleur = nouvelleCouleur; if (!j.uid) j.uid = uid; modified = true; 
+                } 
                 return j; 
             }); 
         } 
-        if (modified) { historyRef.doc(doc.id).update({ joueursComplets: data.joueursComplets, classement: data.classement }); } 
+        if (modified) { 
+            historyRef.doc(doc.id).update({ joueursComplets: data.joueursComplets, classement: data.classement }); 
+        } 
     }); 
+    
     chargerAmis(); 
-    chargerHistoriqueParties(); // C'est ici que l'erreur se produisait si la fonction manquait
+    // Vérification que la fonction existe avant appel (évite le crash si pas chargée)
+    if (typeof chargerHistoriqueParties === 'function') {
+        chargerHistoriqueParties();
+    }
 }
 
+// 5. Fonction Charger la liste des amis (Et le menu déroulant)
 function chargerAmis() { 
     if (!currentUser) return; 
+    
+    // Référence à la base
     db.collection('utilisateurs').doc(currentUser.uid).collection('amis').get().then(snapshot => { 
         mesAmis = []; 
-        friendsListContainer.innerHTML = ""; 
-        selectAmiAjout.innerHTML = '<option value="">-- Choisir un profil --</option>'; 
         
-        // 1. AJOUTER "MOI"
-        if (monProfilLocal.nom) {
+        // Nettoyage UI
+        if(friendsListContainer) friendsListContainer.innerHTML = ""; 
+        if(selectAmiAjout) selectAmiAjout.innerHTML = '<option value="">-- Choisir un profil --</option>'; 
+        
+        // 1. AJOUTER "MOI" en premier dans le menu déroulant
+        if (monProfilLocal.nom && selectAmiAjout) {
             const optMe = document.createElement('option');
             optMe.value = currentUser.uid;
             optMe.text = `👤 Moi (${monProfilLocal.nom})`; 
@@ -412,37 +465,66 @@ function chargerAmis() {
             selectAmiAjout.appendChild(optMe);
         }
 
-        if (snapshot.empty) { friendsListContainer.innerHTML = "<p>Pas d'amis.</p>"; return; } 
+        if (snapshot.empty) { 
+            if(friendsListContainer) friendsListContainer.innerHTML = "<p>Pas encore d'amis ajoutés.</p>"; 
+            return; 
+        } 
         
-        // 2. AJOUTER AMIS
+        // 2. AJOUTER LES AMIS (Boucle)
         snapshot.forEach(doc => { 
             const ami = doc.data(); 
             mesAmis.push(ami); 
+            
             const pseudo = ami.surnom || ami.email; 
             const couleur = ami.couleur || "#CCCCCC"; 
+            
+            // Création élément Liste (HTML)
             const div = document.createElement('div'); 
             div.className = 'friend-item'; 
             div.innerHTML = ` 
                 <div class="friend-view"> 
-                    <div class="friend-info"> <span class="friend-color-swatch" style="background-color: ${couleur};"></span> <span>${pseudo}</span> <span class="friend-email">(${ami.email})</span> </div> 
-                    <div class="friend-actions"> <button class="btn-icon btn-edit-friend"><i class="fa-solid fa-pencil"></i></button> <button class="btn-icon btn-delete-friend"><i class="fa-solid fa-trash"></i></button> </div> 
+                    <div class="friend-info"> 
+                        <span class="friend-color-swatch" style="background-color: ${couleur};"></span> 
+                        <span>${pseudo}</span> 
+                        <span class="friend-email">(${ami.email})</span> 
+                    </div> 
+                    <div class="friend-actions"> 
+                        <button class="btn-icon btn-edit-friend"><i class="fa-solid fa-pencil"></i></button> 
+                        <button class="btn-icon btn-delete-friend"><i class="fa-solid fa-trash"></i></button> 
+                    </div> 
                 </div> 
-                <div class="friend-edit-form"> <input type="text" class="edit-surnom" value="${pseudo}"> <input type="color" class="edit-couleur" value="${couleur}"> <button class="btn-save-friend"><i class="fa-solid fa-check"></i></button> <button class="btn-cancel-friend"><i class="fa-solid fa-times"></i></button> </div> 
+                <div class="friend-edit-form"> 
+                    <input type="text" class="edit-surnom" value="${pseudo}"> 
+                    <input type="color" class="edit-couleur" value="${couleur}"> 
+                    <button class="btn-save-friend"><i class="fa-solid fa-check"></i></button> 
+                    <button class="btn-cancel-friend"><i class="fa-solid fa-times"></i></button> 
+                </div> 
             `; 
-            friendsListContainer.appendChild(div); 
-            const viewDiv = div.querySelector('.friend-view'); const editDiv = div.querySelector('.friend-edit-form'); 
+            
+            if(friendsListContainer) friendsListContainer.appendChild(div); 
+            
+            // Gestionnaires d'événements (Boutons Edit/Delete)
+            const viewDiv = div.querySelector('.friend-view'); 
+            const editDiv = div.querySelector('.friend-edit-form'); 
+            
             viewDiv.querySelector('.btn-edit-friend').onclick = () => { viewDiv.style.display = 'none'; editDiv.style.display = 'flex'; }; 
             viewDiv.querySelector('.btn-delete-friend').onclick = () => supprimerAmi(ami.uid); 
             editDiv.querySelector('.btn-cancel-friend').onclick = () => { editDiv.style.display = 'none'; viewDiv.style.display = 'flex'; }; 
-            editDiv.querySelector('.btn-save-friend').onclick = () => { sauvegarderAmi(ami.uid, editDiv.querySelector('.edit-surnom').value, editDiv.querySelector('.edit-couleur').value, pseudo); }; 
+            editDiv.querySelector('.btn-save-friend').onclick = () => { 
+                sauvegarderAmi(ami.uid, editDiv.querySelector('.edit-surnom').value, editDiv.querySelector('.edit-couleur').value, pseudo); 
+            }; 
             
-            const opt = document.createElement('option'); 
-            opt.value = ami.uid; opt.text = pseudo; opt.dataset.couleur = couleur; 
-            selectAmiAjout.appendChild(opt); 
+            // Ajout dans le menu déroulant "Nouvelle Partie"
+            if (selectAmiAjout) {
+                const opt = document.createElement('option'); 
+                opt.value = ami.uid; 
+                opt.text = pseudo; 
+                opt.dataset.couleur = couleur; 
+                selectAmiAjout.appendChild(opt); 
+            }
         }); 
     }); 
 }
-
 // =============================================================
 // 7. LOGIQUE JEU - CONFIGURATION
 // =============================================================
