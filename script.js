@@ -939,7 +939,6 @@ function afficherStatsGlobales() {
 // 10. FONCTIONS HELPERS, REVEAL & GRAPHIQUES (DONT DETAILS)
 // =============================================================
 
-// --- FONCTION QUI MANQUAIT (DÉPLACÉE AVANT SON APPEL) ---
 // Affiche la page de détails avec la liste des parties pour un jeu donné
 function afficherDetailsHistoriqueJeu(nomJeu) {
     // 1. Changement de page et Titre
@@ -996,7 +995,8 @@ function afficherDetailsHistoriqueJeu(nomJeu) {
                 if(j.rang === 1) medaille = '🥇';
                 if(j.rang === 2) medaille = '🥈';
                 if(j.rang === 3) medaille = '🥉';
-                // ICI : Ajout du " : " avant le score
+                
+                // --- CORRECTION ICI : Ajout de " : " ---
                 podiumHTML += `<span style="margin-right:10px;"><span class="podium-medaille-small">${medaille}</span> ${j.nom} : <strong>${j.scoreTotal}</strong></span>`;
             });
         }
