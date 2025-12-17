@@ -16,6 +16,7 @@ let mesAmis = [];
 // Profil local
 let monProfilLocal = { nom: '', couleur: '#e67e22', uid: null };
 
+// Variables Graphique Historique (Analyse)
 let monGraphiquePosition = null;
 let joueursSurGraphique = [];
 const COULEURS_GRAPH = ['#36A2EB', '#FF6384', '#4BC0C0', '#FFCE56', '#9966FF', '#FF9F40'];
@@ -41,6 +42,7 @@ const inputIdMap = {
 const auth = firebase.auth(); 
 let partieIdActuelle = null; 
 let currentUser = null;
+const db = firebase.firestore(); // Assure-toi que db est bien initialisé ici si ce n'est pas fait dans le HTML
 
 // =============================================================
 // 2. SÉLECTION DES ÉLÉMENTS HTML (DOM)
@@ -301,17 +303,13 @@ btnUpdatePassword.addEventListener('click', () => {
 });
 
 // =============================================================
-// 6. GESTION DES AMIS (CORRIGÉE & SÉCURISÉE)
+// 6. GESTION DES AMIS
 // =============================================================
 
 // 1. Écouteur du bouton "Ajouter"
 if (btnAddFriend) {
     btnAddFriend.addEventListener('click', () => {
-        // Sécurité : Vérifier si les champs existent
-        if (!friendEmailInput || !friendNicknameInput || !friendColorInput) {
-            console.error("Erreur : Champs d'ajout d'ami introuvables dans le HTML.");
-            return;
-        }
+        if (!friendEmailInput || !friendNicknameInput || !friendColorInput) return;
 
         const email = friendEmailInput.value.trim();
         const nickname = friendNicknameInput.value.trim();
@@ -351,12 +349,9 @@ function ajouterAmi(email, nickname, color) {
         const amiUid = amiDoc.uid;
         const amiEmail = amiDoc.email;
 
-        // Si couleur/surnom vide, on prend ceux du profil public ou une couleur aléatoire
-        // Note: genererCouleurAleatoire doit être défini plus bas dans le code (Section 7), c'est normal.
         const finalNickname = nickname || amiDoc.pseudo || amiEmail.split('@')[0];
         const finalColor = color || amiDoc.couleur || (typeof genererCouleurAleatoire === 'function' ? genererCouleurAleatoire() : '#cccccc');
 
-        // Ajout dans la base de données
         db.collection('utilisateurs').doc(currentUser.uid).collection('amis').doc(amiUid).set({
             email: amiEmail,
             uid: amiUid,
@@ -369,11 +364,9 @@ function ajouterAmi(email, nickname, color) {
                 friendAddMsg.style.color = "green";
             }
             
-            // Vider les champs
             friendEmailInput.value = "";
             friendNicknameInput.value = "";
             
-            // Rafraîchir la liste
             chargerAmis();
             
             setTimeout(() => { if(friendAddMsg) friendAddMsg.classList.add('cache'); }, 3000);
@@ -398,7 +391,7 @@ function supprimerAmi(uid) {
     } 
 }
 
-// 4. Fonction Sauvegarder Ami (Modification) + Update Historique
+// 4. Fonction Sauvegarder Ami (Modification)
 async function sauvegarderAmi(uid, nouveauSurnom, nouvelleCouleur, ancienNom) { 
     if (!currentUser) return; 
     
@@ -438,25 +431,21 @@ async function sauvegarderAmi(uid, nouveauSurnom, nouvelleCouleur, ancienNom) {
     }); 
     
     chargerAmis(); 
-    // Vérification que la fonction existe avant appel (évite le crash si pas chargée)
     if (typeof chargerHistoriqueParties === 'function') {
         chargerHistoriqueParties();
     }
 }
 
-// 5. Fonction Charger la liste des amis (Et le menu déroulant)
+// 5. Fonction Charger la liste des amis
 function chargerAmis() { 
     if (!currentUser) return; 
     
-    // Référence à la base
     db.collection('utilisateurs').doc(currentUser.uid).collection('amis').get().then(snapshot => { 
         mesAmis = []; 
         
-        // Nettoyage UI
         if(friendsListContainer) friendsListContainer.innerHTML = ""; 
         if(selectAmiAjout) selectAmiAjout.innerHTML = '<option value="">-- Choisir un profil --</option>'; 
         
-        // 1. AJOUTER "MOI" en premier dans le menu déroulant
         if (monProfilLocal.nom && selectAmiAjout) {
             const optMe = document.createElement('option');
             optMe.value = currentUser.uid;
@@ -470,7 +459,6 @@ function chargerAmis() {
             return; 
         } 
         
-        // 2. AJOUTER LES AMIS (Boucle)
         snapshot.forEach(doc => { 
             const ami = doc.data(); 
             mesAmis.push(ami); 
@@ -478,7 +466,6 @@ function chargerAmis() {
             const pseudo = ami.surnom || ami.email; 
             const couleur = ami.couleur || "#CCCCCC"; 
             
-            // Création élément Liste (HTML)
             const div = document.createElement('div'); 
             div.className = 'friend-item'; 
             div.innerHTML = ` 
@@ -503,7 +490,6 @@ function chargerAmis() {
             
             if(friendsListContainer) friendsListContainer.appendChild(div); 
             
-            // Gestionnaires d'événements (Boutons Edit/Delete)
             const viewDiv = div.querySelector('.friend-view'); 
             const editDiv = div.querySelector('.friend-edit-form'); 
             
@@ -514,7 +500,6 @@ function chargerAmis() {
                 sauvegarderAmi(ami.uid, editDiv.querySelector('.edit-surnom').value, editDiv.querySelector('.edit-couleur').value, pseudo); 
             }; 
             
-            // Ajout dans le menu déroulant "Nouvelle Partie"
             if (selectAmiAjout) {
                 const opt = document.createElement('option'); 
                 opt.value = ami.uid; 
@@ -525,6 +510,7 @@ function chargerAmis() {
         }); 
     }); 
 }
+
 // =============================================================
 // 7. LOGIQUE JEU - CONFIGURATION
 // =============================================================
@@ -743,15 +729,15 @@ listePartiesSauvegardees.addEventListener('click', e => {
                 mettreAJourScoresAffichage(); 
                 creerGraphique(); 
                 if (!scoresSecrets && monGraphique) { 
-                     monGraphique.data.labels = ['Manche 0'];
-                     joueurs.forEach((j, idx) => {
-                         let cum = 0;
-                         const data = [0];
-                         j.scoresTour.forEach(s => { cum += s; data.push(cum); });
-                         if(monGraphique.data.datasets[idx]) monGraphique.data.datasets[idx].data = data;
-                     });
-                     for(let i=1; i<=mancheActuelle; i++) if(monGraphique.data.labels.length <= i) monGraphique.data.labels.push(`Manche ${i}`);
-                     monGraphique.update(); 
+                      monGraphique.data.labels = ['Manche 0'];
+                      joueurs.forEach((j, idx) => {
+                          let cum = 0;
+                          const data = [0];
+                          j.scoresTour.forEach(s => { cum += s; data.push(cum); });
+                          if(monGraphique.data.datasets[idx]) monGraphique.data.datasets[idx].data = data;
+                      });
+                      for(let i=1; i<=mancheActuelle; i++) if(monGraphique.data.labels.length <= i) monGraphique.data.labels.push(`Manche ${i}`);
+                      monGraphique.update(); 
                 } 
                 mettreAJourCompteurs(); 
             } 
@@ -853,7 +839,6 @@ async function sauvegarderHistoriquePartie(classement) {
     } catch (err) { console.error("Erreur historique: ", err); } 
 }
 
-// CORRECTION HISTORIQUE (LA FONCTION MANQUANTE EST ICI)
 async function chargerHistoriqueParties() { 
     if (!currentUser) return; 
     const userRef = db.collection('utilisateurs').doc(currentUser.uid); 
@@ -938,19 +923,192 @@ function afficherStatsGlobales() {
     });
 
     // 2. Fréquence
-    const partiesParJeu = {};
-    allHistoryData.forEach(p => { const n = p.nomJeu || "Parties"; partiesParJeu[n] = (partiesParJeu[n]||0)+1; });
-    const freqTries = Object.entries(partiesParJeu).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    statsJeuxFrequenceListe.innerHTML = freqTries.map(([n,c]) => `<li>${n} <span>(${c})</span></li>`).join('');
+    const partiesParJeu = {}; 
+    allHistoryData.forEach(p => { const n = p.nomJeu || "Parties"; partiesParJeu[n] = (partiesParJeu[n]||0)+1; }); 
+    const freqTries = Object.entries(partiesParJeu).sort((a,b)=>b[1]-a[1]).slice(0,3); 
+    statsJeuxFrequenceListe.innerHTML = freqTries.map(([n,c]) => `<li>${n} <span>(${c})</span></li>`).join(''); 
 
     // 3. Top Joueurs
-    const compteJoueurs = {};
-    allHistoryData.forEach(p => { (p.joueursComplets || p.classement).forEach(j => { compteJoueurs[j.nom] = (compteJoueurs[j.nom]||0)+1; }); });
-    const joueursTries = Object.entries(compteJoueurs).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    statsJoueursPodiumListe.innerHTML = joueursTries.map(([n,c]) => `<li>${n} <span>(${c})</span></li>`).join('');
+    const compteJoueurs = {}; 
+    allHistoryData.forEach(p => { (p.joueursComplets || p.classement).forEach(j => { compteJoueurs[j.nom] = (compteJoueurs[j.nom]||0)+1; }); }); 
+    const joueursTries = Object.entries(compteJoueurs).sort((a,b)=>b[1]-a[1]).slice(0,3); 
+    statsJoueursPodiumListe.innerHTML = joueursTries.map(([n,c]) => `<li>${n} <span>(${c})</span></li>`).join(''); 
 }
 
-// --- RESTE (Helpers, Reveal, Graphiques) ---
+// =============================================================
+// 10. FONCTIONS HELPERS, REVEAL & GRAPHIQUES (DONT DETAILS)
+// =============================================================
+
+// --- FONCTION QUI MANQUAIT (DÉPLACÉE AVANT SON APPEL) ---
+function afficherDetailsHistoriqueJeu(nomJeu) {
+    // 1. Changement de page et Titre
+    showPage('page-history-details');
+    historyDetailsTitle.textContent = `Historique : ${nomJeu}`;
+
+    // 2. Filtrer les données pour ce jeu
+    const partiesDuJeu = allHistoryData.filter(p => (p.nomJeu || "Parties") === nomJeu);
+
+    // 3. Remplir le select pour le graphique
+    const joueursUniques = new Set();
+    partiesDuJeu.forEach(p => {
+        if (p.classement) p.classement.forEach(j => joueursUniques.add(j.nom));
+        if (p.joueursComplets) p.joueursComplets.forEach(j => joueursUniques.add(j.nom));
+    });
+    
+    historyPlayerSelect.innerHTML = '<option value="">-- Ajouter au graphique --</option>';
+    [...joueursUniques].sort().forEach(nom => {
+        const opt = document.createElement('option');
+        opt.value = nom;
+        opt.textContent = nom;
+        historyPlayerSelect.appendChild(opt);
+    });
+
+    // 4. Reset du graphique et des tags
+    joueursSurGraphique = []; 
+    if (monProfilLocal.nom && joueursUniques.has(monProfilLocal.nom)) {
+        joueursSurGraphique.push(monProfilLocal.nom);
+    }
+    mettreAJourTagsGraphique();
+    redessinerGraphiquePosition(partiesDuJeu);
+
+    // 5. Afficher la liste des parties
+    listeHistoriquePartiesDetails.innerHTML = '';
+    
+    if (partiesDuJeu.length === 0) {
+        listeHistoriquePartiesDetails.innerHTML = "<p>Aucune donnée trouvée.</p>";
+        return;
+    }
+
+    partiesDuJeu.forEach(partie => {
+        const div = document.createElement('div');
+        div.className = 'partie-historique';
+        
+        const dateObj = new Date(partie.date);
+        const dateStr = dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+        const heureStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        let podiumHTML = '';
+        if (partie.classement) {
+            const top3 = partie.classement.filter(j => j.rang <= 3).sort((a,b) => a.rang - b.rang);
+            top3.forEach(j => {
+                let medaille = '';
+                if(j.rang === 1) medaille = '🥇';
+                if(j.rang === 2) medaille = '🥈';
+                if(j.rang === 3) medaille = '🥉';
+                podiumHTML += `<span style="margin-right:10px;"><span class="podium-medaille-small">${medaille}</span> ${j.nom} <strong>${j.scoreTotal}</strong></span>`;
+            });
+        }
+
+        div.innerHTML = `
+            <div class="header-info">
+                <span class="time-date"><i class="far fa-calendar-alt"></i> ${dateStr} à ${heureStr}</span>
+                <div class="action-buttons">
+                    <button class="voir-hist-btn" data-id="${partie.id}"><i class="fas fa-eye"></i> Voir</button>
+                    <button class="supprimer-hist-btn" data-id="${partie.id}"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <div class="podium-mini">
+                ${podiumHTML}
+            </div>
+            <div style="margin-top:5px; font-size:0.85em; color:#666;">
+                ${partie.manches} manches jouées • ${partie.lowScoreWins ? 'Le plus petit gagne' : 'Le plus grand gagne'}
+            </div>
+        `;
+        listeHistoriquePartiesDetails.appendChild(div);
+    });
+}
+
+function mettreAJourTagsGraphique() {
+    graphPlayersList.innerHTML = '';
+    joueursSurGraphique.forEach((nom, index) => {
+        const tag = document.createElement('div');
+        tag.className = 'graph-player-tag';
+        const couleur = COULEURS_GRAPH[index % COULEURS_GRAPH.length];
+        tag.style.borderLeft = `4px solid ${couleur}`;
+        
+        tag.innerHTML = `${nom} <span class="bouton-retirer" data-nom="${nom}">&times;</span>`;
+        
+        tag.querySelector('.bouton-retirer').addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            joueursSurGraphique = joueursSurGraphique.filter(n => n !== nom);
+            mettreAJourTagsGraphique();
+            
+            const nomJeu = historyDetailsTitle.textContent.replace('Historique : ', '');
+            const parties = allHistoryData.filter(p => (p.nomJeu || "Parties") === nomJeu).sort((a,b)=>new Date(a.date)-new Date(b.date));
+            redessinerGraphiquePosition(parties);
+        });
+        
+        graphPlayersList.appendChild(tag);
+    });
+}
+
+function redessinerGraphiquePosition(partiesTrieesParDate) {
+    if (joueursSurGraphique.length === 0 || partiesTrieesParDate.length === 0) {
+        if(monGraphiquePosition) {
+            monGraphiquePosition.destroy();
+            monGraphiquePosition = null;
+        }
+        return;
+    }
+
+    const partiesChronologiques = [...partiesTrieesParDate].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const labels = partiesChronologiques.map(p => {
+        const d = new Date(p.date);
+        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+    });
+
+    const datasets = joueursSurGraphique.map((nomJoueur, index) => {
+        const data = partiesChronologiques.map(partie => {
+            const joueurData = partie.classement.find(j => j.nom === nomJoueur);
+            return joueurData ? joueurData.rang : null; 
+        });
+
+        const couleur = COULEURS_GRAPH[index % COULEURS_GRAPH.length];
+
+        return {
+            label: nomJoueur,
+            data: data,
+            borderColor: couleur,
+            backgroundColor: couleur,
+            tension: 0.1,
+            spanGaps: true 
+        };
+    });
+
+    if (monGraphiquePosition) monGraphiquePosition.destroy();
+
+    monGraphiquePosition = new Chart(canvasGraphiquePosition, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    reverse: true,
+                    title: { display: true, text: 'Position (Rang)' },
+                    min: 1,
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y + (context.parsed.y === 1 ? 'er' : 'ème');
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// --- AUTRES HELPERS ---
+
 function genererChampsSaisie() { saisiePointsDiv.innerHTML = ''; joueurs.forEach((joueur, index) => { const div = document.createElement('div'); div.className = 'saisie-item'; div.innerHTML = ` <label for="score-${index}"> <span class="score-couleur-swatch" style="background-color: ${joueur.couleur};"></span> ${joueur.nom} : </label> <input type="number" id="score-${index}" value="0"> `; saisiePointsDiv.appendChild(div); }); }
 function mettreAJourScoresAffichage() { scoreAffichageDiv.innerHTML = ''; let listePourAffichage = []; if (!scoresSecrets) { let joueursTries = [...joueurs].sort((a, b) => { return lowScoreWins ? a.scoreTotal - b.scoreTotal : b.scoreTotal - a.scoreTotal; }); listePourAffichage = calculerRangs(joueursTries); } else { listePourAffichage = joueurs; } let html = '<table class="classement-table">'; html += '<thead><tr><th>#</th><th>Joueur</th><th>Total</th></tr></thead>'; html += '<tbody>'; listePourAffichage.forEach((joueur) => { const rangAffichage = joueur.rang && !scoresSecrets ? joueur.rang : '-'; html += ` <tr> <td>${rangAffichage}</td> <td> <span class="score-couleur-swatch" style="background-color: ${joueur.couleur};"></span> ${joueur.nom} </td> <td class="score-total">${scoresSecrets ? '???' : `${joueur.scoreTotal} pts`}</td> </tr> `; }); html += '</tbody></table>'; scoreAffichageDiv.innerHTML = html; }
 function mettreAJourCompteurs() { manchesPasseesAffichage.textContent = mancheActuelle; let restantesManches = Infinity; let afficherManchesRestantes = false; if (conditionsArret.manche_total.active) { const totalManches = conditionsArret.manche_total.mancheCible; restantesManches = Math.max(0, totalManches - mancheActuelle); afficherManchesRestantes = true; } if (conditionsArret.manche_restante.active) { const mancheCible = conditionsArret.manche_restante.mancheCible; const restantesDynamiques = Math.max(0, mancheCible - mancheActuelle); restantesManches = Math.min(restantesManches, restantesDynamiques); afficherManchesRestantes = true; } if (afficherManchesRestantes) { manchesRestantesAffichage.textContent = restantesManches; manchesRestantesAffichageDiv.classList.remove('cache'); } else { manchesRestantesAffichageDiv.classList.add('cache'); } let pointsMinRestants = Infinity; let afficherPointsRestants = false; if (conditionsArret.score_limite.active) { const scoreMax = Math.max(...joueurs.map(j => j.scoreTotal)); const restantsAbsolu = Math.max(0, conditionsArret.score_limite.valeur - scoreMax); pointsMinRestants = Math.min(pointsMinRestants, restantsAbsolu); afficherPointsRestants = true; } if (conditionsArret.score_relatif.active) { joueurs.forEach(joueur => { let limiteCible = (joueur.scoreRelatifPivot || 0) + conditionsArret.score_relatif.valeur; const restantsRelatif = Math.max(0, limiteCible - joueur.scoreTotal); pointsMinRestants = Math.min(pointsMinRestants, restantsRelatif); }); afficherPointsRestants = true; } if (afficherPointsRestants) { pointsRestantsAffichage.textContent = pointsMinRestants; pointsRestantsAffichageDiv.classList.remove('cache'); } else { pointsRestantsAffichageDiv.classList.add('cache'); } }
@@ -991,189 +1149,3 @@ addPlayerToGraphBtn.addEventListener('click', () => { const nom = historyPlayerS
 historyGridJeux.addEventListener('click', (e) => { const square = e.target.closest('.history-game-square'); if (square) afficherDetailsHistoriqueJeu(square.dataset.nomJeu); });
 historyBackBtn.addEventListener('click', () => { showPage('page-history-grid'); joueursSurGraphique = []; mettreAJourTagsGraphique(); if(monGraphiquePosition) { monGraphiquePosition.destroy(); monGraphiquePosition=null; } });
 listeHistoriquePartiesDetails.addEventListener('click', async (e) => { const target = e.target; const id = target.dataset.id; if (!id || !currentUser) return; if (target.classList.contains('supprimer-hist-btn')) { if (confirm("Supprimer ?")) { await db.collection('utilisateurs').doc(currentUser.uid).collection('historique').doc(id).delete(); await chargerHistoriqueParties(); const nomJeu = historyDetailsTitle.textContent.replace('Historique : ', ''); afficherDetailsHistoriqueJeu(nomJeu); } } if (target.classList.contains('voir-hist-btn')) { const partieData = allHistoryData.find(p => p.id === id); if (partieData) { classementFinal = partieData.classement; joueurs = partieData.joueursComplets; lowScoreWins = partieData.lowScoreWins; mancheActuelle = partieData.manches; showPage('page-podium'); construirePodiumFinal(); recreerGraphiqueFinal(); } } });
-
-// =============================================================
-// 10. FONCTIONS MANQUANTES (HISTORIQUE DÉTAILLÉ)
-// =============================================================
-
-// Affiche la page de détails avec la liste des parties pour un jeu donné
-function afficherDetailsHistoriqueJeu(nomJeu) {
-    // 1. Changement de page et Titre
-    showPage('page-history-details');
-    historyDetailsTitle.textContent = `Historique : ${nomJeu}`;
-
-    // 2. Filtrer les données pour ce jeu
-    // On gère le cas où nomJeu est undefined dans la base (anciennes parties)
-    const partiesDuJeu = allHistoryData.filter(p => (p.nomJeu || "Parties") === nomJeu);
-
-    // 3. Remplir le select pour le graphique (Liste des joueurs uniques ayant joué à ce jeu)
-    const joueursUniques = new Set();
-    partiesDuJeu.forEach(p => {
-        if (p.classement) p.classement.forEach(j => joueursUniques.add(j.nom));
-        if (p.joueursComplets) p.joueursComplets.forEach(j => joueursUniques.add(j.nom));
-    });
-    
-    historyPlayerSelect.innerHTML = '<option value="">-- Ajouter au graphique --</option>';
-    [...joueursUniques].sort().forEach(nom => {
-        const opt = document.createElement('option');
-        opt.value = nom;
-        opt.textContent = nom;
-        historyPlayerSelect.appendChild(opt);
-    });
-
-    // 4. Reset du graphique et des tags
-    joueursSurGraphique = []; // On vide la sélection précédente
-    // On ajoute automatiquement l'utilisateur courant s'il a joué
-    if (monProfilLocal.nom && joueursUniques.has(monProfilLocal.nom)) {
-        joueursSurGraphique.push(monProfilLocal.nom);
-    }
-    mettreAJourTagsGraphique();
-    redessinerGraphiquePosition(partiesDuJeu);
-
-    // 5. Afficher la liste des parties (Cartes)
-    listeHistoriquePartiesDetails.innerHTML = '';
-    
-    if (partiesDuJeu.length === 0) {
-        listeHistoriquePartiesDetails.innerHTML = "<p>Aucune donnée trouvée.</p>";
-        return;
-    }
-
-    partiesDuJeu.forEach(partie => {
-        const div = document.createElement('div');
-        div.className = 'partie-historique';
-        
-        // Formatage de la date
-        const dateObj = new Date(partie.date);
-        const dateStr = dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-        const heureStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
-        // Création du mini-podium (Top 3) pour l'aperçu
-        let podiumHTML = '';
-        if (partie.classement) {
-            const top3 = partie.classement.filter(j => j.rang <= 3).sort((a,b) => a.rang - b.rang);
-            top3.forEach(j => {
-                let medaille = '';
-                if(j.rang === 1) medaille = '🥇';
-                if(j.rang === 2) medaille = '🥈';
-                if(j.rang === 3) medaille = '🥉';
-                podiumHTML += `<span style="margin-right:10px;"><span class="podium-medaille-small">${medaille}</span> ${j.nom} <strong>${j.scoreTotal}</strong></span>`;
-            });
-        }
-
-        div.innerHTML = `
-            <div class="header-info">
-                <span class="time-date"><i class="far fa-calendar-alt"></i> ${dateStr} à ${heureStr}</span>
-                <div class="action-buttons">
-                    <button class="voir-hist-btn" data-id="${partie.id}"><i class="fas fa-eye"></i> Voir</button>
-                    <button class="supprimer-hist-btn" data-id="${partie.id}"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-            <div class="podium-mini">
-                ${podiumHTML}
-            </div>
-            <div style="margin-top:5px; font-size:0.85em; color:#666;">
-                ${partie.manches} manches jouées • ${partie.lowScoreWins ? 'Le plus petit gagne' : 'Le plus grand gagne'}
-            </div>
-        `;
-        listeHistoriquePartiesDetails.appendChild(div);
-    });
-}
-
-// Met à jour les petites étiquettes des joueurs sous le graphique d'analyse
-function mettreAJourTagsGraphique() {
-    graphPlayersList.innerHTML = '';
-    joueursSurGraphique.forEach((nom, index) => {
-        const tag = document.createElement('div');
-        tag.className = 'graph-player-tag';
-        // Attribution d'une couleur fixe basée sur l'index pour la cohérence visuelle
-        const couleur = COULEURS_GRAPH[index % COULEURS_GRAPH.length];
-        tag.style.borderLeft = `4px solid ${couleur}`;
-        
-        tag.innerHTML = `${nom} <span class="bouton-retirer" data-nom="${nom}">&times;</span>`;
-        
-        // Gestion suppression du joueur du graph
-        tag.querySelector('.bouton-retirer').addEventListener('click', (e) => {
-            e.stopPropagation(); // Évite de déclencher d'autres clics
-            joueursSurGraphique = joueursSurGraphique.filter(n => n !== nom);
-            mettreAJourTagsGraphique();
-            
-            // On recharge le graph
-            const nomJeu = historyDetailsTitle.textContent.replace('Historique : ', '');
-            const parties = allHistoryData.filter(p => (p.nomJeu || "Parties") === nomJeu).sort((a,b)=>new Date(a.date)-new Date(b.date));
-            redessinerGraphiquePosition(parties);
-        });
-        
-        graphPlayersList.appendChild(tag);
-    });
-}
-
-// Dessine le graphique d'évolution des positions (Analyse)
-function redessinerGraphiquePosition(partiesTrieesParDate) {
-    // Si aucun joueur sélectionné ou pas de parties, on nettoie
-    if (joueursSurGraphique.length === 0 || partiesTrieesParDate.length === 0) {
-        if(monGraphiquePosition) {
-            monGraphiquePosition.destroy();
-            monGraphiquePosition = null;
-        }
-        return;
-    }
-
-    // Inverser l'ordre des dates pour le graph (Chronologique : Ancien -> Récent)
-    // Note: partiesTrieesParDate arrive souvent trié "Plus récent en premier" depuis Firebase
-    // On s'assure qu'elles sont dans l'ordre chronologique croissant pour le dessin
-    const partiesChronologiques = [...partiesTrieesParDate].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    const labels = partiesChronologiques.map(p => {
-        const d = new Date(p.date);
-        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
-    });
-
-    const datasets = joueursSurGraphique.map((nomJoueur, index) => {
-        const data = partiesChronologiques.map(partie => {
-            // Trouver le rang du joueur dans cette partie
-            const joueurData = partie.classement.find(j => j.nom === nomJoueur);
-            return joueurData ? joueurData.rang : null; // null si pas joué, ChartJS gère les trous
-        });
-
-        const couleur = COULEURS_GRAPH[index % COULEURS_GRAPH.length];
-
-        return {
-            label: nomJoueur,
-            data: data,
-            borderColor: couleur,
-            backgroundColor: couleur,
-            tension: 0.1,
-            spanGaps: true // Relie les points même s'il a raté une partie au milieu
-        };
-    });
-
-    if (monGraphiquePosition) monGraphiquePosition.destroy();
-
-    monGraphiquePosition = new Chart(canvasGraphiquePosition, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    reverse: true, // IMPORTANT : Le rang 1 est en haut, le rang 10 en bas
-                    title: { display: true, text: 'Position (Rang)' },
-                    min: 1,
-                    ticks: { stepSize: 1 }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + (context.parsed.y === 1 ? 'er' : 'ème');
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
