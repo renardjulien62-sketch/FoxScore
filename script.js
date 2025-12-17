@@ -1044,7 +1044,9 @@ function mettreAJourTagsGraphique() {
     });
 }
 
+// Dessine le graphique d'évolution des positions (Analyse en %)
 function redessinerGraphiquePosition(partiesTrieesParDate) {
+    // Si aucun joueur sélectionné ou pas de parties, on nettoie
     if (joueursSurGraphique.length === 0 || partiesTrieesParDate.length === 0) {
         if(monGraphiquePosition) {
             monGraphiquePosition.destroy();
@@ -1062,8 +1064,20 @@ function redessinerGraphiquePosition(partiesTrieesParDate) {
 
     const datasets = joueursSurGraphique.map((nomJoueur, index) => {
         const data = partiesChronologiques.map(partie => {
+            // Trouver le rang du joueur dans cette partie
             const joueurData = partie.classement.find(j => j.nom === nomJoueur);
-            return joueurData ? joueurData.rang : null; 
+            
+            if (!joueurData) return null; // Pas joué
+
+            const rang = joueurData.rang;
+            const nbJoueurs = partie.classement.length;
+
+            // Calcul du pourcentage de performance (1er = 100%, Dernier = 0%)
+            if (nbJoueurs <= 1) return 100; // Cas solo ou bug
+            
+            // Formule : (NombreJoueurs - Rang) / (NombreJoueurs - 1) * 100
+            const performance = ((nbJoueurs - rang) / (nbJoueurs - 1)) * 100;
+            return Math.round(performance); 
         });
 
         const couleur = COULEURS_GRAPH[index % COULEURS_GRAPH.length];
@@ -1073,8 +1087,8 @@ function redessinerGraphiquePosition(partiesTrieesParDate) {
             data: data,
             borderColor: couleur,
             backgroundColor: couleur,
-            tension: 0.1,
-            spanGaps: true 
+            tension: 0.3, // Un peu plus courbe pour l'esthétique
+            spanGaps: true
         };
     });
 
@@ -1088,19 +1102,23 @@ function redessinerGraphiquePosition(partiesTrieesParDate) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false, // Permet au graph de bien prendre la hauteur
             scales: {
                 y: {
-                    reverse: true,
-                    title: { display: true, text: 'Position (Rang)' },
-                    min: 1,
-                    ticks: { stepSize: 1 }
+                    // On enlève reverse: true car 100% est naturellement en haut
+                    beginAtZero: true,
+                    max: 105, // Un peu de marge en haut
+                    title: { display: true, text: 'Performance (%)' },
+                    ticks: { 
+                        callback: function(value) { return value + "%" } 
+                    }
                 }
             },
             plugins: {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + (context.parsed.y === 1 ? 'er' : 'ème');
+                            return context.dataset.label + ': ' + context.parsed.y + '%';
                         }
                     }
                 }
